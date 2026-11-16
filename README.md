@@ -118,7 +118,8 @@ Then ask Claude to "set up vault memory". The skill asks where the vault should 
 whether to sync with a remote, then runs the installer with `--no-skill`. The plugin ships the skill in English
 (`vault-memory`) and Turkish (`vault-hafiza`).
 
-Without the plugin system: `npx skills add yusufkaran/karpathy-llm-wiki-autopilot`.
+Without the plugin system: `npx skills add yusufkaran/karpathy-llm-wiki-autopilot --skill vault-memory`
+(or `--skill vault-hafiza` for Turkish).
 
 ## How it works
 

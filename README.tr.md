@@ -125,7 +125,8 @@ Sonra Claude'a "vault hafıza kurulumunu yap" de. Skill vault'un nerede duracağ
 eşitlenip eşitlenmeyeceğini sorar, sonra kurulum betiğini `--no-skill` ile çalıştırır. Plugin skill'i İngilizce
 (`vault-memory`) ve Türkçe (`vault-hafiza`) olarak getirir.
 
-Plugin sistemi olmadan: `npx skills add yusufkaran/karpathy-llm-wiki-autopilot`.
+Plugin sistemi olmadan: `npx skills add yusufkaran/karpathy-llm-wiki-autopilot --skill vault-hafiza`
+(İngilizcesi için `--skill vault-memory`).
 
 ## Pano
 
