@@ -9,6 +9,7 @@ import argparse
 import copy
 import fcntl
 import hashlib
+import itertools
 import json
 import os
 import re
@@ -63,6 +64,7 @@ DEFAULTS = {
     "sources": ["claude", "codex"],
     "capture": False,
     "capture_window_hours": 24,
+    "capture_interval_seconds": 60,
     "process_remote": False,
     "remote_idle_minutes": 30,
     "ingest_dirs": ["00-Inbox", "05-Raw/clippings", "05-Raw/files"],
@@ -1020,19 +1022,26 @@ def _tool_line(name, inp, files):
     return "%s: %s" % (name.replace("mcp__", ""), clip(brief, 110))
 
 
-def _read_tail(path, offset, limit=None):
-    """Complete lines after offset (up to limit) as (line, start offset) pairs, plus the new offset."""
-    with open(path, "rb") as f:
-        f.seek(offset)
-        data = f.read() if limit is None else f.read(max(0, int(limit) - int(offset)))
-    end = data.rfind(b"\n")
-    if end < 0:
-        return [], offset
-    out, pos = [], offset
-    for raw in data[: end + 1].split(b"\n")[:-1]:
-        out.append((raw, pos))
-        pos += len(raw) + 1
-    return out, offset + end + 1
+class _Lines(object):
+    """Complete lines after offset (up to limit) as (line, start offset), read as a stream.
+
+    Transcripts can be hundreds of MB, so the file is never loaded whole. `end` is the offset just past the last
+    complete line handed out; a final line without a newline is still being written and is left for later.
+    """
+
+    def __init__(self, path, offset, limit=None):
+        self.path, self.offset, self.limit, self.end = path, int(offset), limit, int(offset)
+
+    def __iter__(self):
+        pos = self.offset
+        with open(self.path, "rb") as f:
+            f.seek(pos)
+            for raw in f:
+                if not raw.endswith(b"\n") or (self.limit is not None and pos + len(raw) > int(self.limit)):
+                    break
+                yield raw[:-1], pos
+                pos += len(raw)
+                self.end = pos
 
 
 def _new_seg(source, path):
@@ -1049,9 +1058,9 @@ def parse_claude(path, offset, gap_hours=3.0, limit=None):
     A gap of more than gap_hours between two messages ends the sitting; the rest is read as a separate
     section on the next call.
     """
-    lines, new_offset = _read_tail(path, offset, limit)
+    lines = _Lines(path, offset, limit)
     seg = _new_seg("claude", path)
-    seg["new_offset"] = new_offset
+    seg["new_offset"] = None
     last_ts = None
     for raw, pos in lines:
         if not raw.strip():
@@ -1114,19 +1123,22 @@ def parse_claude(path, offset, gap_hours=3.0, limit=None):
                     line = _tool_line(str(b.get("name") or ""), b.get("input"), seg["files"])
                     if line:
                         seg["events"].append((ts, "tool", line))
+    if seg["new_offset"] is None:
+        seg["new_offset"] = lines.end
     if not seg["session_id"]:
         seg["session_id"] = Path(path).stem
     return seg
 
 
 def parse_codex(path, offset, gap_hours=3.0, limit=None):
-    lines, new_offset = _read_tail(path, offset, limit)
+    reader = _Lines(path, offset, limit)
     seg = _new_seg("codex", path)
-    seg["new_offset"] = new_offset
+    seg["new_offset"] = None
+    lines = reader
     if offset > 0:  # session metadata is on the first line
         try:
             with open(path, "rb") as f:
-                lines = [(f.readline(), None)] + lines
+                lines = itertools.chain([(f.readline(), None)], reader)
         except Exception:
             pass
     last_ts = None
@@ -1189,6 +1201,8 @@ def parse_codex(path, offset, gap_hours=3.0, limit=None):
                 seg["files"].add(m.group(1).strip())
             if name not in ("update_plan",):
                 seg["events"].append((ts, "tool", "%s: %s" % (name, clip(body.replace("\n", " "), 110))))
+    if seg["new_offset"] is None:
+        seg["new_offset"] = reader.end
     if not seg["session_id"]:
         seg["session_id"] = Path(path).stem
     return seg
@@ -1521,39 +1535,43 @@ def P(key):
 # The worker agent reads untrusted text (session digests, web clippings) and may edit files inside the vault.
 # The prompt tells it what not to touch; this guard enforces it. Before each call the protected paths are
 # snapshotted, and afterwards every change to them is reverted and reported, before anything is committed.
-# Protected: the tool, shared config and templates (99-Meta/, except Lint reports), the agent rules
-# (CLAUDE.md, AGENTS.md), the script-managed index.md and log.md, every dot file and dot folder at the vault root
-# (.claude/, .obsidian/ plugins, .gitattributes, …) and .git/config, .git/hooks, .git/info.
+# Protected, at any depth: agent instruction files (CLAUDE.md, CLAUDE.local.md, AGENTS.md) and every path with a
+# component that starts with "." (.claude/, .obsidian/ plugins, .gitattributes, …), including all of .git except
+# its object store, logs, index and lock files. Also the tool, shared config and templates (99-Meta/, except
+# Lint reports) and the script-managed index.md and log.md at the root.
 
-GUARD_FILES = ("CLAUDE.md", "AGENTS.md", "index.md", "log.md")
-GUARD_SKIP_ROOT = (".trash", ".DS_Store")
+INSTRUCTION_FILES = {"CLAUDE.md", "CLAUDE.local.md", "AGENTS.md"}
+GUARD_IGNORE_NAMES = {".DS_Store"}
 
 
 def _guarded_paths(root):
-    out = [root / n for n in GUARD_FILES]
-    meta = root / "99-Meta"
-    if meta.is_dir():
-        for p in meta.rglob("*"):
-            parts = p.relative_to(meta).parts
-            if parts[0] == "Lint" or "__pycache__" in parts:
-                continue
-            out.append(p)
-    try:
-        entries = list(root.iterdir())
-    except OSError:
-        entries = []
-    for e in entries:
-        if not e.name.startswith(".") or e.name in GUARD_SKIP_ROOT:
+    out = [root / "index.md", root / "log.md"]
+    for dirpath, dirnames, filenames in os.walk(str(root)):
+        rel = Path(dirpath).relative_to(root).parts
+        if not rel:
+            dirnames[:] = [n for n in dirnames if n != ".trash"]  # Obsidian's trash: the user's deletions
+        if "__pycache__" in rel:
+            dirnames[:] = []
             continue
-        if e.name == ".git":
-            out.append(e / "config")
-            for sub in ("hooks", "info"):
-                if (e / sub).is_dir():
-                    out += list((e / sub).rglob("*"))
-        elif e.is_dir() and not e.is_symlink():
-            out += [p for p in e.rglob("*") if not (e.name == ".obsidian" and p.name.startswith("workspace"))]
-        else:
-            out.append(e)
+        in_git = rel[:1] == (".git",)
+        if in_git:
+            if len(rel) == 1:
+                dirnames[:] = [n for n in dirnames if n != "logs"]
+            elif rel[:2] == (".git", "objects"):
+                dirnames[:] = [n for n in dirnames if n == "info"] if len(rel) == 2 else dirnames
+                if len(rel) == 2:
+                    continue  # loose objects and packs: written only by git, never by the agent
+        dotted = any(p.startswith(".") for p in rel)
+        meta = rel[:1] == ("99-Meta",) and rel[1:2] != ("Lint",)
+        for name in filenames + [n for n in dirnames if os.path.islink(os.path.join(dirpath, n))]:
+            if name in GUARD_IGNORE_NAMES:
+                continue
+            if in_git and (name == "index" or name.endswith(".lock")):
+                continue  # refreshed by `git status`, which Claude Code itself runs at start
+            if rel[:1] == (".obsidian",) and name.startswith("workspace"):
+                continue  # Obsidian's window layout
+            if dotted or meta or name.startswith(".") or name in INSTRUCTION_FILES:
+                out.append(Path(dirpath) / name)
     return out
 
 
@@ -1603,6 +1621,7 @@ def guarded_llm(cfg, prompt):
     finally:
         reverted = guard_restore(cfg["vault"], before)
         if reverted:
+            log("guard: reverted %s" % ", ".join(reverted))
             set_alert(T("alert_guard", ", ".join(reverted[:5]) + (" …" if len(reverted) > 5 else "")))
 
 
@@ -2120,6 +2139,16 @@ def remote_packets(cfg, force=False):
 # ------------------------------------------------------------------ worker
 
 
+def background_priority():
+    """Background work yields the CPU and disk to whatever the user is doing (child processes inherit it)."""
+    try:
+        cur = os.nice(0)
+        if cur < 10:
+            os.nice(10 - cur)
+    except OSError:
+        pass
+
+
 def spawn_worker(extra=(), command="worker"):
     try:
         LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -2318,6 +2347,8 @@ Description=Vault memory worker
 [Service]
 Type=oneshot
 ExecStart=%h/.vault-memory/bin/vm tick
+Nice=10
+IOSchedulingClass=idle
 """,
     "vault-memory.timer": """[Unit]
 Description=Run the vault memory worker every 5 minutes
@@ -2383,7 +2414,10 @@ def _systemd_available():
 def install_timer(interval=300):
     """Runs `vm tick` every few minutes: launchd on macOS, a systemd user timer on Linux, else prints a cron line."""
     if sys.platform == "darwin":
-        sched = "  <key>StartInterval</key><integer>%d</integer>\n" % interval
+        sched = ("  <key>StartInterval</key><integer>%d</integer>\n"
+                 "  <key>ProcessType</key><string>Background</string>\n"
+                 "  <key>LowPriorityIO</key><true/>\n"
+                 "  <key>Nice</key><integer>10</integer>\n" % interval)
         plist, r = _launchd_load(TICK_LABEL, "tick", sched, "launchd.log")
         print(T("timer_ok", plist, interval // 60) if r.returncode == 0 else T("timer_fail", (r.stderr or r.stdout).strip()))
         return
@@ -2688,7 +2722,14 @@ def cmd_hook(args):
     cfg = load_config()
     event = args.event
     if event in ("stop", "session-end") and cfg.get("capture"):
-        spawn_worker(command="capture")  # push the digest now; if the lid closes, the server applies it
+        # Push the digest now, so an always-on machine can apply it if the lid closes. After a reply this happens at
+        # most once per capture_interval_seconds; whatever is newer goes with the next capture or the timer.
+        try:
+            age = time.time() - (STATE_DIR / "capture.json").stat().st_mtime
+        except OSError:
+            age = 1e9
+        if event == "session-end" or age >= float(cfg["capture_interval_seconds"]):
+            spawn_worker(command="capture")
     if event == "stop":
         try:
             age = time.time() - TRIGGER_FILE.stat().st_mtime
@@ -3243,6 +3284,8 @@ def main():
     u.add_argument("--keep-skill", action="store_true", help=T("h_keep_skill"))
     u.set_defaults(fn=cmd_uninstall)
     args = ap.parse_args()
+    if args.cmd in ("worker", "tick", "capture", "ingest", "backfill"):
+        background_priority()
     if not getattr(args, "fn", None):
         ap.print_help()
         return 1

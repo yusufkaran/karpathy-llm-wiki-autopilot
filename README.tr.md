@@ -216,6 +216,19 @@ saatteki süreden uzun olabilir.
   ortak ayar bunları değiştiremez.
 - Pano `127.0.0.1` adresine bağlanır ve yalnızca okur.
 
+## Kaynak kullanımı
+
+258 oturum dosyası (toplam 2,6 GB, en büyüğü 330 MB) olan bir Mac'te ölçüldü:
+
+- Zamanlayıcı ve cevap sonrası hook kısa bir Python süreci başlatır (yaklaşık 30 MB, 0,1 sn) ve çıkar. Bekleyen
+  oturumları bulmak 0,02 sn sürer; oturum dosyaları akış halinde okunur, 330 MB'lık dosya bile 100 MB civarında kalır.
+- Arka plan işleri düşük öncelikte çalışır (`nice 10`; macOS'ta zamanlayıcı düşük öncelikli disk erişimli `Background`
+  launchd işi, Linux'ta `IOSchedulingClass=idle`).
+- Ajan cevabından sonra özet en fazla dakikada bir gönderilir (`capture_interval_seconds`).
+- En ağır adım, biten her oturum için bir kez ve tek tek yapılan `claude -p` çağrısıdır.
+- Pano sunucusu boşta yaklaşık 30 MB ve %0 işlemcide durur; sayfa yalnızca sekmesi görünürken dakikada bir sorar ve
+  yalnızca bir şey değiştiyse yeniden çizer. Normal sayfa çiziminin ötesinde GPU kullanmaz.
+
 ## Maliyet
 
 Gerçek içeriği olan her biten oturum bir `claude -p` çağrısıdır; varsayılan model `sonnet`, çağrı başına sınır

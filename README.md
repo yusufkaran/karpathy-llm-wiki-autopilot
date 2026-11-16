@@ -214,6 +214,19 @@ add up to more than the hours on the clock.
   config; the shared config in the vault cannot set them.
 - The dashboard binds to `127.0.0.1` and only reads.
 
+## Resource use
+
+Measured on a Mac with 258 transcripts (2.6 GB, the largest 330 MB):
+
+- The timer and the after-reply hook start a short Python process (about 30 MB, 0.1 s) and exit. Finding pending
+  sessions takes 0.02 s; transcripts are read as a stream, so even a 330 MB file stays near 100 MB of memory.
+- Background work runs at low priority (`nice 10`; on macOS the timer is a `Background` launchd job with low-priority
+  I/O, on Linux `IOSchedulingClass=idle`).
+- After an agent reply, digests are pushed at most once a minute (`capture_interval_seconds`).
+- The heaviest step is the `claude -p` call itself, once per finished session, one at a time.
+- The dashboard server idles at about 30 MB and 0% CPU; the page polls once a minute, only while its tab is
+  visible, and redraws only when something changed. No GPU work beyond normal page rendering.
+
 ## Cost
 
 Each finished session with real content is one `claude -p` call, with `sonnet` by default and capped at

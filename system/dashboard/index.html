@@ -1051,19 +1051,29 @@ new ResizeObserver(() => {
 // ---------- loading ----------
 const INJECTED = window.__VM_DATA__ || window.__PANO_DATA__ || null;
 async function getJSON(url) { const r = await fetch(url, { cache: "no-store" }); if (!r.ok) throw new Error(`${url}: ${r.status}`); return r.json(); }
+let LAST_STATUS = "", LAST_DAY = "";
 async function refresh(manual) {
   if (INJECTED) return;
-  document.body.classList.add("loading");
+  if (manual || !DATA) document.body.classList.add("loading");
   try {
     const [data, status] = await Promise.all([getJSON("/api/data"), getJSON("/api/status").catch(() => null)]);
-    STATUS = status;
+    const statusKey = JSON.stringify(status);
+    const day = new Date().toDateString();
     const first = !DATA;
-    if (!DATA || data.generated !== DATA.generated || manual) {
+    const changed = first || data.generated !== DATA.generated || manual;
+    // The page polls every minute; redraw only when the data, the worker status or the date changed.
+    if (!changed && statusKey === LAST_STATUS && day === LAST_DAY) return;
+    STATUS = status;
+    LAST_STATUS = statusKey;
+    if (changed) {
       DATA = prepare(data);
       if (first) setLang(pickLang(), false);
       buildFilters();
       if (first || st.preset) applyPreset();
+    } else if (day !== LAST_DAY && st.preset) {
+      applyPreset();
     }
+    LAST_DAY = day;
     render();
   } catch (e) {
     $("meta").textContent = T("loadErr", e.message);
