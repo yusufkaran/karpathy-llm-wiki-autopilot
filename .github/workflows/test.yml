@@ -5,9 +5,10 @@ on:
 jobs:
   test:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        python: ["3.9", "3.12"]
+        python: ["3.10", "3.13"]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -16,3 +17,11 @@ jobs:
           python-version: ${{ matrix.python }}
       - run: python -m unittest discover -s tests -v
       - run: python system/dashboard/server.py --demo --dump > /dev/null
+  # The oldest supported version: macOS ships Python 3.9 as /usr/bin/python3, which launchd jobs often use.
+  macos-system-python:
+    runs-on: macos-latest
+    env:
+      PATH: /usr/bin:/bin:/usr/sbin:/sbin
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 --version && python3 -m unittest discover -s tests -v
