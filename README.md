@@ -206,8 +206,9 @@ add up to more than the hours on the clock.
   commits.
 - The worker reads untrusted text (session digests, web clippings), so what it may change is enforced in code,
   not only in its instructions. Before each call the protected paths are snapshotted: `99-Meta/` (the tool, the
-  shared config, templates), `CLAUDE.md`, `AGENTS.md`, `index.md`, `log.md`, every dot file and dot folder at the
-  vault root (`.claude/`, `.obsidian/` plugins, …) and `.git/config`, `.git/hooks`. Any change to them is reverted
+  shared config, templates), `index.md`, `log.md`, agent instruction files such as `CLAUDE.md` and `AGENTS.md` at
+  any depth and in any letter case, every dot file and dot folder at any depth (`.claude/`, `.obsidian/` plugins, …)
+  and the git metadata in `.git`. Any change to them is reverted
   before the commit, and `vm status` shows an alert. Injected text can still shape what the worker writes into
   ordinary pages, so review sources you ingest from the web.
 - `claude_bin`, `path`, `setting_sources`, `capture` and `process_remote` are read only from the per-machine

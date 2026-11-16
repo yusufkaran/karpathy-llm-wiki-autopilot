@@ -19,6 +19,7 @@ import subprocess
 import sys
 import time
 import traceback
+import unicodedata
 from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -1540,7 +1541,13 @@ def P(key):
 # its object store, logs, index and lock files. Also the tool, shared config and templates (99-Meta/, except
 # Lint reports) and the script-managed index.md and log.md at the root.
 
-INSTRUCTION_FILES = {"CLAUDE.md", "CLAUDE.local.md", "AGENTS.md"}
+# Compared case-insensitively and after Unicode normalization: macOS file systems ignore case, so claude.md is
+# read as CLAUDE.md.
+INSTRUCTION_FILES = {"claude.md", "claude.local.md", "agents.md", "agents.override.md", "gemini.md"}
+
+
+def _norm_name(name):
+    return unicodedata.normalize("NFC", name).casefold()
 GUARD_IGNORE_NAMES = {".DS_Store"}
 
 
@@ -1570,7 +1577,7 @@ def _guarded_paths(root):
                 continue  # refreshed by `git status`, which Claude Code itself runs at start
             if rel[:1] == (".obsidian",) and name.startswith("workspace"):
                 continue  # Obsidian's window layout
-            if dotted or meta or name.startswith(".") or name in INSTRUCTION_FILES:
+            if dotted or meta or name.startswith(".") or _norm_name(name) in INSTRUCTION_FILES:
                 out.append(Path(dirpath) / name)
     return out
 

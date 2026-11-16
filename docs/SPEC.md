@@ -56,10 +56,15 @@ language still parses.
 
 ## Write guard
 
-Every `claude -p` call (`guarded_llm`) is wrapped in a snapshot of the protected paths: `99-Meta/**` except
-`99-Meta/Lint/`, `CLAUDE.md`, `AGENTS.md`, `index.md`, `log.md`, every dot file and dot folder at the vault root
-except `.trash/` and `.obsidian/workspace*`, and `.git/config`, `.git/hooks/`, `.git/info/`. Changes the agent made
-to them (edits, new files, deletions, mode changes) are reverted before anything is committed, and an alert is set.
+Every `claude -p` call (`guarded_llm`) is wrapped in a snapshot of the protected paths. Changes the agent made to
+them (edits, new files, deletions, mode changes) are reverted before anything is committed, logged in full, and an
+alert is set. Protected:
+
+- agent instruction files at any depth: `CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`, `AGENTS.override.md`,
+  `GEMINI.md`, compared case-insensitively after Unicode NFC normalization;
+- every path with a component that starts with `.` (except `.trash/`, `.DS_Store`, `.obsidian/workspace*`),
+  including all of `.git` except `objects/` (but `objects/info/` is protected), `logs/`, `index` and `*.lock`;
+- `99-Meta/**` except `99-Meta/Lint/`, and `index.md`, `log.md` at the root.
 
 ## Session file
 
