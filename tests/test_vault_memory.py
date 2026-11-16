@@ -280,6 +280,18 @@ class UnitTest(unittest.TestCase):
             self.assertFalse(cfg["capture"])
             self.assertEqual(cfg["model"], "opus")
 
+    def test_uninstall_never_touches_services_it_did_not_install(self):
+        calls = []
+        real_run, real_home = self.vm.subprocess.run, self.vm.HOME
+        self.vm.subprocess.run = lambda *a, **k: calls.append(a) or self.vm._Res(0)
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                self.vm.HOME = Path(d)
+                self.assertIsNone(self.vm._launchd_unload(self.vm.TICK_LABEL))
+        finally:
+            self.vm.subprocess.run, self.vm.HOME = real_run, real_home
+        self.assertEqual(calls, [])
+
     def test_messages_complete(self):
         for key, pair in self.vm.MESSAGES.items():
             self.assertEqual(len(pair), 2, key)

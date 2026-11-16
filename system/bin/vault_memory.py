@@ -2399,12 +2399,14 @@ def _launchd_load(label, args, schedule, log_name):
 
 
 def _launchd_unload(label):
+    """Unloads and deletes the agent, but only one installed from this HOME: launchd's user domain is shared by
+    every HOME of the same user, so a test or a second install must not stop the real one."""
     plist = _plist_path(label)
+    if not plist.exists():
+        return None
     subprocess.run(["launchctl", "bootout", "gui/%d/%s" % (os.getuid(), label)], capture_output=True)
-    if plist.exists():
-        plist.unlink()
-        return plist
-    return None
+    plist.unlink()
+    return plist
 
 
 def _systemctl(*args):
@@ -3185,13 +3187,15 @@ def cmd_uninstall(args):
             if p:
                 print(T("un_removed", p))
     elif shutil.which("systemctl"):
-        _systemctl("disable", "--now", "vault-memory.timer", "vault-memory-dashboard.service")
-        for name in SYSTEMD_UNITS:
-            p = SYSTEMD_DIR / name
-            if p.exists():
-                p.unlink()
-                print(T("un_removed", p))
-        _systemctl("daemon-reload")
+        installed = [n for n in SYSTEMD_UNITS if (SYSTEMD_DIR / n).exists()]  # only units from this HOME
+        active = [n for n in installed if n.endswith(".timer") or n == "vault-memory-dashboard.service"]
+        if active:
+            _systemctl("disable", "--now", *active)
+        for name in installed:
+            (SYSTEMD_DIR / name).unlink()
+            print(T("un_removed", SYSTEMD_DIR / name))
+        if installed:
+            _systemctl("daemon-reload")
     if not args.keep_skill:
         names = {"vault-memory", "vault-hafiza"} | {p.name for p in _skill_dirs(vault)}
         for name in sorted(names):
