@@ -121,6 +121,10 @@ MESSAGES = {
                      "Commit durduruldu: eklenen satırlarda sır benzeri değer var (%s). Değeri vault'tan sil, sonra `vm sync` çalıştır."),
     "alert_conflict": ("Vault could not sync: manual changes on this machine conflict with the remote. Run `git pull --rebase` in the vault folder and resolve the conflict.",
                        "Vault eşitlenemedi: bu makinedeki elle değişiklikler uzak depoyla çakışıyor. Vault klasöründe `git pull --rebase` çalıştırıp çakışmayı çöz."),
+    "alert_guard": ("The worker agent changed protected files (%s); the changes were reverted. Check the source it was "
+                    "reading for injected instructions.",
+                    "İşçi ajan korunan dosyaları değiştirdi (%s); değişiklikler geri alındı. Okuduğu kaynakta araya "
+                    "sokulmuş talimat olup olmadığına bak."),
     "commit_failed": ("commit failed: %s", "commit başarısız: %s"),
     "commit_manual": ("manual: vault changes (%s)", "elle: vault değişiklikleri (%s)"),
     "commit_index": ("index: regenerated", "index: yeniden üretildi"),
@@ -348,11 +352,18 @@ def shared_config_path(vault):
     return Path(vault) / "99-Meta" / "System" / "config.json"
 
 
+# Keys that decide what runs, where, and what leaves the machine. They are read only from the per-machine
+# config: the shared config travels with the vault, and anyone (or anything) that can change the vault must not
+# be able to change them on every machine.
+MACHINE_ONLY_KEYS = ("vault", "machine", "claude_bin", "path", "setting_sources", "capture", "process_remote")
+
+
 def load_config():
     cfg = dict(DEFAULTS)
     machine = load_json(CONFIG_FILE, {})
     vault = machine.get("vault") or str(script_vault())
-    cfg.update(load_json(shared_config_path(vault), {}))
+    shared = load_json(shared_config_path(vault), {})
+    cfg.update({k: v for k, v in (shared.items() if isinstance(shared, dict) else []) if k not in MACHINE_ONLY_KEYS})
     cfg.update(machine)
     cfg["vault"] = vault
     if not cfg.get("machine"):
@@ -1505,6 +1516,96 @@ def P(key):
     return PROMPTS[LANG][key]
 
 
+# ------------------------------------------------------------------ write guard
+#
+# The worker agent reads untrusted text (session digests, web clippings) and may edit files inside the vault.
+# The prompt tells it what not to touch; this guard enforces it. Before each call the protected paths are
+# snapshotted, and afterwards every change to them is reverted and reported, before anything is committed.
+# Protected: the tool, shared config and templates (99-Meta/, except Lint reports), the agent rules
+# (CLAUDE.md, AGENTS.md), the script-managed index.md and log.md, every dot file and dot folder at the vault root
+# (.claude/, .obsidian/ plugins, .gitattributes, …) and .git/config, .git/hooks, .git/info.
+
+GUARD_FILES = ("CLAUDE.md", "AGENTS.md", "index.md", "log.md")
+GUARD_SKIP_ROOT = (".trash", ".DS_Store")
+
+
+def _guarded_paths(root):
+    out = [root / n for n in GUARD_FILES]
+    meta = root / "99-Meta"
+    if meta.is_dir():
+        for p in meta.rglob("*"):
+            parts = p.relative_to(meta).parts
+            if parts[0] == "Lint" or "__pycache__" in parts:
+                continue
+            out.append(p)
+    try:
+        entries = list(root.iterdir())
+    except OSError:
+        entries = []
+    for e in entries:
+        if not e.name.startswith(".") or e.name in GUARD_SKIP_ROOT:
+            continue
+        if e.name == ".git":
+            out.append(e / "config")
+            for sub in ("hooks", "info"):
+                if (e / sub).is_dir():
+                    out += list((e / sub).rglob("*"))
+        elif e.is_dir() and not e.is_symlink():
+            out += [p for p in e.rglob("*") if not (e.name == ".obsidian" and p.name.startswith("workspace"))]
+        else:
+            out.append(e)
+    return out
+
+
+def guard_snapshot(vault):
+    root = Path(vault)
+    snap = {}
+    for p in _guarded_paths(root):
+        try:
+            if p.is_symlink():
+                snap[str(p.relative_to(root))] = ("link", os.readlink(str(p)), 0)
+            elif p.is_file():
+                snap[str(p.relative_to(root))] = ("file", p.read_bytes(), p.stat().st_mode & 0o7777)
+        except OSError:
+            pass
+    return snap
+
+
+def guard_restore(vault, before):
+    """Reverts changes made to protected paths since `before`. Returns the changed vault-relative paths."""
+    root = Path(vault)
+    after = guard_snapshot(vault)
+    changed = sorted(rel for rel in set(before) | set(after) if before.get(rel) != after.get(rel))
+    for rel in changed:
+        p, old = root / rel, before.get(rel)
+        try:
+            if p.is_symlink() or (p.exists() and not p.is_dir()):
+                p.unlink()
+            elif p.is_dir():
+                shutil.rmtree(str(p))
+            if old and old[0] == "link":
+                p.parent.mkdir(parents=True, exist_ok=True)
+                os.symlink(old[1], str(p))
+            elif old:
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_bytes(old[1])
+                os.chmod(str(p), old[2])
+        except OSError as e:
+            log("guard: %s: %s" % (rel, e))
+    return changed
+
+
+def guarded_llm(cfg, prompt):
+    """run_llm with the write guard around it."""
+    before = guard_snapshot(cfg["vault"])
+    try:
+        return run_llm(cfg, prompt)
+    finally:
+        reverted = guard_restore(cfg["vault"], before)
+        if reverted:
+            set_alert(T("alert_guard", ", ".join(reverted[:5]) + (" …" if len(reverted) > 5 else "")))
+
+
 # Usage-limit messages from the Claude CLI: the session is retried later instead of counted as a failure.
 LIMIT_RE = re.compile(r"(?i)hit your .{0,40}limit|usage limit|rate.?limit|limit reached|resets \d|overloaded|\b429\b|quota")
 
@@ -1802,7 +1903,7 @@ def apply_packet(cfg, state, pkt):
             project_steps=steps,
             digest=pkt["digest"],
         )
-        ok, result, cost = run_llm(cfg, prompt)
+        ok, result, cost = guarded_llm(cfg, prompt)
         log("LLM %s · %s · %s · %s %s · $%.3f · %s" % (T("ok") if ok else T("error"), scope, pkt["machine"], minutes, V("unit"),
                                                       cost, clip(result.replace("\n", " "), 160)))
         if not ok:
@@ -2380,9 +2481,14 @@ def ingest_candidates(cfg, force=False, only=""):
         done = {l.split()[0] for l in ledger.read_text(encoding="utf-8").splitlines() if l.strip()}
     idle = float(cfg["ingest_idle_minutes"]) * 60
     out = []
+    real_vault = vault.resolve()
     for d in cfg.get("ingest_dirs", []):
-        base = vault / d
-        if not base.is_dir():
+        base = (vault / d).resolve()
+        try:
+            top = base.relative_to(real_vault).parts[0]
+        except (ValueError, IndexError):
+            continue  # only folders inside the vault
+        if top.startswith(".") or top == "99-Meta" or not base.is_dir():
             continue
         for p in sorted(base.rglob("*")):
             if not p.is_file() or p.name.startswith(".") or p.suffix.lower() not in INGEST_EXT:
@@ -2436,7 +2542,7 @@ def cmd_ingest(args):
     when = now_local(cfg).strftime("%Y-%m-%d %H:%M")
     n = 0
     for rel, digest in ingest_candidates(cfg, force=args.now, only=args.path or "")[: int(cfg["ingest_max_per_run"])]:
-        ok, result, cost = run_llm(cfg, P("ingest").format(rel=rel, date=date))
+        ok, result, cost = guarded_llm(cfg, P("ingest").format(rel=rel, date=date))
         log("INGEST %s · %s · $%.3f · %s" % (T("ok") if ok else T("error"), rel, cost, clip(result.replace("\n", " "), 160)))
         if not ok:
             if LIMIT_RE.search(result or ""):

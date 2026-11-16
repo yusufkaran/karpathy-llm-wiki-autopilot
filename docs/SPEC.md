@@ -22,6 +22,8 @@ The tool lives inside the vault, so every machine that pulls the vault runs the 
   `idle_minutes`, `gap_cap_minutes`, `model`, and the other defaults in `DEFAULTS`.
 - Per machine: `~/.vault-memory/config.json` (`$VAULT_MEMORY_HOME`). Keys: `vault`, `machine`, `claude_bin`,
   `path`, `capture`, `process_remote`. Per-machine values override shared ones.
+- `vault`, `machine`, `claude_bin`, `path`, `setting_sources`, `capture`, `process_remote` are machine-only:
+  `load_config` ignores them in the shared config.
 - Default `language` is `en`. Missing `language` in an existing vault means `en`; the Turkish vault sets `"language": "tr"`.
 
 ## Vault layout (same folder names in every language)
@@ -51,6 +53,13 @@ index.md, log.md, CLAUDE.md, AGENTS.md
 
 Readers (dashboard, `recount`, `report`) accept both languages' units and labels, so a vault that switched
 language still parses.
+
+## Write guard
+
+Every `claude -p` call (`guarded_llm`) is wrapped in a snapshot of the protected paths: `99-Meta/**` except
+`99-Meta/Lint/`, `CLAUDE.md`, `AGENTS.md`, `index.md`, `log.md`, every dot file and dot folder at the vault root
+except `.trash/` and `.obsidian/workspace*`, and `.git/config`, `.git/hooks/`, `.git/info/`. Changes the agent made
+to them (edits, new files, deletions, mode changes) are reverted before anything is committed, and an alert is set.
 
 ## Session file
 

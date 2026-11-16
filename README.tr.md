@@ -206,6 +206,14 @@ saatteki süreden uzun olabilir.
 - İşçi `claude -p`'yi yalnızca Read, Glob, Grep, Edit ve Write araçlarıyla, Bash ve MCP sunucusu olmadan, hook'lar
   kapalı ve çağrı başına bütçe sınırıyla çalıştırır. Vault klasöründe çalışır ve git komutu çalıştırmaz; commit'i
   betik yapar.
+- İşçi güvenilmeyen metin okur (oturum özetleri, web kırpıntıları); bu yüzden neyi değiştirebileceği yalnızca
+  talimatla değil kodla da sınırlanır. Her çağrıdan önce korunan yerlerin anlık görüntüsü alınır: `99-Meta/` (araç,
+  ortak ayar, şablonlar), `CLAUDE.md`, `AGENTS.md`, `index.md`, `log.md`, vault kökündeki bütün nokta ile başlayan
+  dosya ve klasörler (`.claude/`, `.obsidian/` eklentileri, …) ve `.git/config`, `.git/hooks`. Bunlara yapılan her
+  değişiklik commit'ten önce geri alınır ve `vm status` uyarı gösterir. Araya sokulmuş metin sıradan sayfalara
+  yazılanları yine de etkileyebilir; web'den işlettiğin kaynaklara göz at.
+- `claude_bin`, `path`, `setting_sources`, `capture` ve `process_remote` yalnızca makine ayarından okunur; vault'taki
+  ortak ayar bunları değiştiremez.
 - Pano `127.0.0.1` adresine bağlanır ve yalnızca okur.
 
 ## Maliyet
