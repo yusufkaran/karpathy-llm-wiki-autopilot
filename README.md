@@ -1,14 +1,14 @@
 # LLM Wiki Autopilot
 
-**Persistent memory for Claude Code and Codex, written into Obsidian automatically.**
+**Andrej Karpathy's LLM Wiki pattern, on autopilot: persistent memory for Claude Code and Codex, written into
+Obsidian automatically.**
 
 Every coding-agent session you finish becomes part of a wiki: a dated session log, a living page per project,
-decisions and lessons. It is Andrej Karpathy's "LLM Wiki" pattern on autopilot: no "save this" prompts, no
-manual notes. The wiki is plain Markdown in a git repository, so it syncs across your machines, and every new
+decisions and lessons, with no "save this" prompts and no manual notes. The wiki is plain Markdown in a git repository, so it syncs across your machines, and every new
 Claude Code session starts with the project's current status already in context. A local dashboard shows where
 your time went.
 
-[![test](https://github.com/yusufkaran/llm-wiki-autopilot/actions/workflows/test.yml/badge.svg)](https://github.com/yusufkaran/llm-wiki-autopilot/actions/workflows/test.yml)
+[![test](https://github.com/yusufkaran/karpathy-llm-wiki-autopilot/actions/workflows/test.yml/badge.svg)](https://github.com/yusufkaran/karpathy-llm-wiki-autopilot/actions/workflows/test.yml)
 ![License: MIT](https://img.shields.io/badge/license-MIT-blue)
 ![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue)
 ![macOS | Linux](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey)
@@ -51,7 +51,7 @@ English | [Türkçe](README.tr.md)
 ## Quick start
 
 ```bash
-git clone https://github.com/yusufkaran/llm-wiki-autopilot ~/.vault-memory/src
+git clone https://github.com/yusufkaran/karpathy-llm-wiki-autopilot ~/.vault-memory/src
 ~/.vault-memory/src/install.sh --vault ~/Vault --lang en --timer
 ```
 
@@ -110,7 +110,7 @@ often closed, turn on `vm config capture true`; on an always-on machine, `vm con
 ### Install as a Claude Code plugin
 
 ```
-/plugin marketplace add yusufkaran/llm-wiki-autopilot
+/plugin marketplace add yusufkaran/karpathy-llm-wiki-autopilot
 /plugin install llm-wiki-autopilot@llm-wiki-autopilot
 ```
 
@@ -118,7 +118,7 @@ Then ask Claude to "set up vault memory". The skill asks where the vault should 
 whether to sync with a remote, then runs the installer with `--no-skill`. The plugin ships the skill in English
 (`vault-memory`) and Turkish (`vault-hafiza`).
 
-Without the plugin system: `npx skills add yusufkaran/llm-wiki-autopilot`.
+Without the plugin system: `npx skills add yusufkaran/karpathy-llm-wiki-autopilot`.
 
 ## How it works
 
@@ -330,7 +330,8 @@ tests/                tests (they use a fake LLM; no API calls)
 ## Credits
 
 The vault model follows Andrej Karpathy's "LLM Wiki" idea: an LLM that maintains a wiki from the sources you
-give it, instead of answering from scratch every time.
+give it, instead of answering from scratch every time. This is an independent project; it is not affiliated with
+or endorsed by Andrej Karpathy.
 
 ## License
 

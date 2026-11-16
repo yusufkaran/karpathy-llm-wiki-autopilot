@@ -3,7 +3,7 @@
 """LLM Wiki Autopilot (vm): turns Claude Code and Codex sessions into an Obsidian vault that maintains itself.
 
 Standard library only; Python 3.9+. The rules for agents live in CLAUDE.md at the vault root.
-Spec: docs/SPEC.md in https://github.com/yusufkaran/llm-wiki-autopilot
+Spec: docs/SPEC.md in https://github.com/yusufkaran/karpathy-llm-wiki-autopilot
 """
 import argparse
 import copy
@@ -1864,14 +1864,23 @@ def recount(sess_file, tool):
     sess_file.write_text(set_fm(text, {"minutes": sum(entries), "sessions": len(entries), "tools": tools}), encoding="utf-8")
 
 
-def ensure_heading(sess_file, hhmm, minutes, tool, summary):
-    """Adds the duration to the heading the agent wrote; writes the heading itself when the agent wrote none."""
+def ensure_heading(sess_file, hhmm, minutes, tool, summary, before=None):
+    """Makes sure this session has exactly one heading with its duration.
+
+    `before` is the file's text before the agent ran. Only headings the agent added count, so a second session that
+    started in the same minute as an earlier one in the same file still gets its own entry.
+    """
     text = sess_file.read_text(encoding="utf-8")
+    before = before or ""
     suffix = "(%d %s · %s)" % (minutes, V("unit"), tool)
-    if re.search(r"^## %s — .*\(%d %s\b" % (re.escape(hhmm), minutes, UNITS_RE), text, re.M):
+    full = re.compile(r"^## %s — .*\(%d %s\b" % (re.escape(hhmm), minutes, UNITS_RE), re.M)
+    if len(full.findall(text)) > len(full.findall(before)):
         return
-    m = re.search(r"^(## %s — .*?)[ \t]*(\(\d+ %s\b[^\n]*\))?[ \t]*$" % (re.escape(hhmm), UNITS_RE), text, re.M)
-    if m:
+    old_heads = set(re.findall(r"^## .*$", before, re.M))
+    heads = re.compile(r"^(## %s — .*?)[ \t]*(\(\d+ %s\b[^\n]*\))?[ \t]*$" % (re.escape(hhmm), UNITS_RE), re.M)
+    new = [m for m in heads.finditer(text) if m.group(0) not in old_heads]
+    if new:  # the agent wrote the heading without (or with a wrong) duration
+        m = new[-1]
         text = text[:m.start()] + m.group(1).rstrip() + " " + suffix + text[m.end():]
     else:
         text = text.rstrip("\n") + "\n\n## %s — %s %s\n" % (hhmm, summary, suffix)
@@ -1929,6 +1938,7 @@ def apply_packet(cfg, state, pkt):
             project_steps=steps,
             digest=pkt["digest"],
         )
+        before_text = sess_file.read_text(encoding="utf-8")
         ok, result, cost = guarded_llm(cfg, prompt)
         log("LLM %s · %s · %s · %s %s · $%.3f · %s" % (T("ok") if ok else T("error"), scope, pkt["machine"], minutes, V("unit"),
                                                       cost, clip(result.replace("\n", " "), 160)))
@@ -1944,7 +1954,7 @@ def apply_packet(cfg, state, pkt):
             res = parse_result(result)
             if "log" in res:
                 summary, pages = res["log"], res["pages"]
-                ensure_heading(sess_file, hhmm, minutes, tool, summary)
+                ensure_heading(sess_file, hhmm, minutes, tool, summary, before_text)
             else:
                 note = res.get("skip") or T("nothing_to_record")
     else:

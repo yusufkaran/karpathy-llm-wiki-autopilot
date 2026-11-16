@@ -121,7 +121,7 @@ Only when `~/.vault-memory/bin/vm` does not exist, or the user asks to set the s
 
    ```bash
    if [ -d ~/.vault-memory/src/.git ]; then git -C ~/.vault-memory/src pull --ff-only; \
-   else git clone https://github.com/yusufkaran/llm-wiki-autopilot ~/.vault-memory/src; fi
+   else git clone https://github.com/yusufkaran/karpathy-llm-wiki-autopilot ~/.vault-memory/src; fi
    ```
 
 3. Install:

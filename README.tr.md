@@ -2,7 +2,8 @@
 
 [English](README.md) | Türkçe
 
-**Claude Code ve Codex için kalıcı hafıza; Obsidian'a kendiliğinden yazılır.**
+**Andrej Karpathy'nin LLM Wiki modeli, otomatik pilotta: Claude Code ve Codex için kalıcı hafıza; Obsidian'a
+kendiliğinden yazılır.**
 
 Bitirdiğin her Claude Code ve Codex oturumu bir Obsidian vault'una
 damıtılır: tarihli oturum kaydı, güncel proje sayfası, kararlar, öğrenimler. Vault bir git deposundaki düz
@@ -58,7 +59,7 @@ git commit + push ──► özel uzak depon ──► diğer makineler çeker
 ## Hızlı başlangıç
 
 ```bash
-git clone https://github.com/yusufkaran/llm-wiki-autopilot ~/.vault-memory/src
+git clone https://github.com/yusufkaran/karpathy-llm-wiki-autopilot ~/.vault-memory/src
 ~/.vault-memory/src/install.sh --vault ~/Vault --lang tr --timer
 ```
 
@@ -116,7 +117,7 @@ Araç vault'un içinde durduğu için her makine en son eşitlenen sürümü ça
 ### Claude Code plugin'i olarak kurma
 
 ```
-/plugin marketplace add yusufkaran/llm-wiki-autopilot
+/plugin marketplace add yusufkaran/karpathy-llm-wiki-autopilot
 /plugin install llm-wiki-autopilot@llm-wiki-autopilot
 ```
 
@@ -124,7 +125,7 @@ Sonra Claude'a "vault hafıza kurulumunu yap" de. Skill vault'un nerede duracağ
 eşitlenip eşitlenmeyeceğini sorar, sonra kurulum betiğini `--no-skill` ile çalıştırır. Plugin skill'i İngilizce
 (`vault-memory`) ve Türkçe (`vault-hafiza`) olarak getirir.
 
-Plugin sistemi olmadan: `npx skills add yusufkaran/llm-wiki-autopilot`.
+Plugin sistemi olmadan: `npx skills add yusufkaran/karpathy-llm-wiki-autopilot`.
 
 ## Pano
 
@@ -304,7 +305,8 @@ tests/                testler (sahte LLM kullanır; API çağrısı yapmaz)
 ## Teşekkür
 
 Vault modeli Andrej Karpathy'nin "LLM Wiki" fikrini izler: her seferinde sıfırdan cevap vermek yerine, verdiğin
-kaynaklardan bir wiki'yi kendisi güncel tutan bir LLM.
+kaynaklardan bir wiki'yi kendisi güncel tutan bir LLM. Bu bağımsız bir projedir; Andrej Karpathy ile bağlantılı değildir ve onun
+tarafından onaylanmamıştır.
 
 ## Lisans
 

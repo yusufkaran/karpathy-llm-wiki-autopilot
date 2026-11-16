@@ -280,6 +280,21 @@ class UnitTest(unittest.TestCase):
             self.assertFalse(cfg["capture"])
             self.assertEqual(cfg["model"], "opus")
 
+    def test_ensure_heading_same_minute(self):
+        self.vm.set_language("en")
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "s.md"
+            first = "---\ntype: session\n---\n\n## 10:00 — First (21 min · claude-code)\n\n**Request:** a\n"
+            f.write_text(first)
+            self.vm.ensure_heading(f, "10:00", 21, "claude-code", "second", first)   # agent wrote nothing
+            f2 = Path(d) / "t.md"
+            f2.write_text(first + "\n## 10:00 — Second one\n\n**Request:** b\n")  # agent forgot the duration
+            self.vm.ensure_heading(f2, "10:00", 21, "claude-code", "x", first)
+            for p in (f, f2):
+                body = p.read_text()
+                self.assertEqual(len(self.vm.ENTRY_RE.findall(body)), 2, body)
+            self.assertIn("## 10:00 — Second one (21 min · claude-code)", f2.read_text())
+
     def test_uninstall_never_touches_services_it_did_not_install(self):
         calls = []
         real_run, real_home = self.vm.subprocess.run, self.vm.HOME
