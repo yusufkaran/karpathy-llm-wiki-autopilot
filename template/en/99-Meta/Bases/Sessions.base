@@ -1,0 +1,55 @@
+filters:
+  and:
+    - note.type == "session"
+formulas:
+  hours: (note.minutes / 60).round(1)
+properties:
+  file.name:
+    displayName: Session file
+  note.date:
+    displayName: Date
+  note.project:
+    displayName: Project
+  note.machine:
+    displayName: Machine
+  note.minutes:
+    displayName: Minutes
+  note.sessions:
+    displayName: Sessions
+  formula.hours:
+    displayName: Hours
+views:
+  - type: table
+    name: All
+    order:
+      - date
+      - project
+      - minutes
+      - formula.hours
+      - sessions
+      - machine
+      - file.name
+    sort:
+      - property: date
+        direction: DESC
+    summaries:
+      minutes: Sum
+      formula.hours: Sum
+  - type: table
+    name: Project
+    filters:
+      and:
+        - list(project).contains(this)
+    order:
+      - date
+      - minutes
+      - formula.hours
+      - sessions
+      - machine
+      - file.name
+    sort:
+      - property: date
+        direction: DESC
+    summaries:
+      minutes: Sum
+      formula.hours: Sum

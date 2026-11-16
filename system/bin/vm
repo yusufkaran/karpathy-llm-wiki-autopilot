@@ -1,0 +1,5 @@
+#!/bin/sh
+# vault-memory launcher: runs vault_memory.py from the folder this file really lives in.
+DIR="$(cd "$(dirname "$0")" && pwd -P)"
+PY="$(command -v python3 2>/dev/null || echo /usr/bin/python3)"
+exec "$PY" "$DIR/vault_memory.py" "$@"

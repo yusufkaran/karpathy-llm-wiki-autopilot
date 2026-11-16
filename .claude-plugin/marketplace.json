@@ -1,0 +1,36 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "obsidian-agent-memory",
+  "owner": {
+    "name": "Yusuf Karan",
+    "url": "https://github.com/yusufkaran"
+  },
+  "metadata": {
+    "description": "Persistent memory for coding agents: Claude Code and Codex sessions distilled into an Obsidian vault, synced with git, with a local time dashboard.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "vault-memory",
+      "source": "./",
+      "description": "Skills to set up, query and maintain an Obsidian vault that your Claude Code and Codex sessions are written into automatically (Karpathy's LLM Wiki pattern), plus per-project time reports and a local dashboard.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Yusuf Karan",
+        "url": "https://github.com/yusufkaran"
+      },
+      "category": "productivity",
+      "homepage": "https://github.com/yusufkaran/obsidian-agent-memory",
+      "keywords": [
+        "obsidian",
+        "memory",
+        "llm-wiki",
+        "knowledge-base",
+        "time-tracking",
+        "dashboard",
+        "codex",
+        "git-sync"
+      ]
+    }
+  ]
+}

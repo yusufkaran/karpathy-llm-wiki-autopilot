@@ -1,0 +1,7 @@
+{
+  "language": "en",
+  "timezone": "",
+  "idle_minutes": 20,
+  "gap_cap_minutes": 5,
+  "model": "sonnet"
+}

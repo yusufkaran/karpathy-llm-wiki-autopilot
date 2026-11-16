@@ -1,0 +1,55 @@
+filters:
+  and:
+    - note.type == "session"
+formulas:
+  saat: (note.minutes / 60).round(1)
+properties:
+  file.name:
+    displayName: Oturum dosyası
+  note.date:
+    displayName: Tarih
+  note.project:
+    displayName: Proje
+  note.machine:
+    displayName: Makine
+  note.minutes:
+    displayName: Dakika
+  note.sessions:
+    displayName: Oturum
+  formula.saat:
+    displayName: Saat
+views:
+  - type: table
+    name: Tümü
+    order:
+      - date
+      - project
+      - minutes
+      - formula.saat
+      - sessions
+      - machine
+      - file.name
+    sort:
+      - property: date
+        direction: DESC
+    summaries:
+      minutes: Sum
+      formula.saat: Sum
+  - type: table
+    name: Proje
+    filters:
+      and:
+        - list(project).contains(this)
+    order:
+      - date
+      - minutes
+      - formula.saat
+      - sessions
+      - machine
+      - file.name
+    sort:
+      - property: date
+        direction: DESC
+    summaries:
+      minutes: Sum
+      formula.saat: Sum

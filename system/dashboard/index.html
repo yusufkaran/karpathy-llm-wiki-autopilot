@@ -1,0 +1,1098 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vault Memory</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --ring: rgba(11,11,11,.10); --hover: rgba(11,11,11,.045);
+  --sel: rgba(42,120,214,.10); --focus: #2a78d6;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300; --s7: #6250d6;
+  --other: #b3b1a9; --neutral-bar: #9b9991; --cell-empty: #efeee9;
+  --q1: #cde2fb; --q2: #9ec5f4; --q3: #6da7ec; --q4: #3987e5; --q5: #256abf; --q6: #184f95; --q7: #0d366b;
+  --warning: #fab219; --tip-bg: #ffffff; --shadow: 0 6px 24px rgba(11,11,11,.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,.10); --hover: rgba(255,255,255,.05);
+    --sel: rgba(57,135,229,.16); --focus: #3987e5;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #0ca30c; --s7: #9085e9;
+    --other: #64635e; --neutral-bar: #7a7872; --cell-empty: #242423;
+    --q1: #104281; --q2: #184f95; --q3: #256abf; --q4: #2a78d6; --q5: #5598e7; --q6: #86b6ef; --q7: #b7d3f6;
+    --tip-bg: #232322; --shadow: 0 6px 24px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --ring: rgba(255,255,255,.10); --hover: rgba(255,255,255,.05);
+  --sel: rgba(57,135,229,.16); --focus: #3987e5;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #0ca30c; --s7: #9085e9;
+  --other: #64635e; --neutral-bar: #7a7872; --cell-empty: #242423;
+  --q1: #104281; --q2: #184f95; --q3: #256abf; --q4: #2a78d6; --q5: #5598e7; --q6: #86b6ef; --q7: #b7d3f6;
+  --tip-bg: #232322; --shadow: 0 6px 24px rgba(0,0,0,.5);
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body { background: var(--page); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+button, input, select { font: inherit; color: inherit; }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 20px 16px 48px; }
+.muted { color: var(--muted); }
+.ink2 { color: var(--ink-2); }
+.num { font-variant-numeric: tabular-nums; }
+
+/* header */
+header { display: flex; align-items: center; gap: 10px 12px; flex-wrap: wrap; margin-bottom: 14px; }
+header h1 { font-size: 18px; font-weight: 650; margin: 0; letter-spacing: -.01em; }
+header .meta { font-size: 12.5px; color: var(--ink-2); flex: 1 1 320px; min-width: 0; }
+header .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.btn { background: var(--surface); border: 1px solid var(--ring); border-radius: 8px; padding: 6px 11px; cursor: pointer; font-size: 13px; }
+.btn:hover { background: var(--hover); }
+.btn.sm { padding: 3px 9px; font-size: 12.5px; }
+.btn:focus-visible, .chip:focus-visible, select:focus-visible, input:focus-visible, [tabindex]:focus-visible, summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.banner { display: flex; gap: 10px; align-items: flex-start; background: var(--surface); border: 1px solid var(--ring); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; font-size: 13px; }
+.banner .ico { width: 18px; height: 18px; flex: none; margin-top: 1px; }
+.banner p { margin: 0; }
+.banner p + p { margin-top: 4px; }
+.tag { display: inline-block; font-size: 11px; font-weight: 600; letter-spacing: .02em; padding: 1px 7px; border-radius: 99px; background: var(--sel); color: var(--ink); vertical-align: 2px; }
+
+/* filters */
+.filters { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; margin-bottom: 16px; }
+.seg { display: inline-flex; background: var(--surface); border: 1px solid var(--ring); border-radius: 9px; padding: 2px; flex-wrap: wrap; }
+.chip { border: 0; background: transparent; border-radius: 7px; padding: 5px 10px; font-size: 13px; cursor: pointer; color: var(--ink-2); }
+.chip:hover { background: var(--hover); }
+.chip[aria-pressed="true"] { background: var(--sel); color: var(--ink); font-weight: 600; }
+.seg.lang .chip { padding: 4px 9px; font-size: 12.5px; }
+.field { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2); }
+.field input, .field select, .search { background: var(--surface); border: 1px solid var(--ring); border-radius: 8px; padding: 5px 8px; font-size: 13px; min-width: 0; }
+.search { width: 210px; }
+.field select { max-width: 220px; }
+
+/* summary */
+.kpis { display: grid; grid-template-columns: minmax(260px, 1.5fr) repeat(4, minmax(130px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.card { background: var(--surface); border: 1px solid var(--ring); border-radius: 12px; padding: 16px; min-width: 0; }
+.kpi .label { font-size: 12.5px; color: var(--ink-2); }
+.kpi .value { font-size: 26px; font-weight: 600; margin-top: 4px; letter-spacing: -.01em; }
+.kpi.hero .value { font-size: 40px; line-height: 1.1; letter-spacing: -.02em; white-space: nowrap; }
+.kpi .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.span2 { grid-column: 1 / -1; }
+.card h2 { font-size: 14px; font-weight: 600; margin: 0; }
+.card .desc { font-size: 12px; color: var(--muted); margin: 2px 0 12px; }
+.card-head { display: flex; justify-content: space-between; gap: 8px 12px; align-items: baseline; flex-wrap: wrap; }
+.card-head .right { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.card-head .right .desc { margin: 0; }
+.empty { color: var(--muted); font-size: 13px; padding: 24px 0; text-align: center; }
+.loading .grid, .loading .kpis { opacity: .55; transition: opacity .15s; }
+
+/* legend */
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0 0 10px; font-size: 12.5px; color: var(--ink-2); }
+.legend button { display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; padding: 2px 0; cursor: pointer; color: inherit; }
+.legend button:hover { color: var(--ink); }
+.legend .sw { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+.legend button[aria-pressed="true"] { color: var(--ink); font-weight: 600; }
+
+/* horizontal bars */
+.hbars { display: grid; grid-template-columns: minmax(90px, 170px) 1fr auto; column-gap: 10px; align-items: center; }
+.hbars .row { display: contents; cursor: pointer; }
+.hbars .name { font-size: 12.5px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 3px 0; }
+.hbars .track { height: 24px; display: flex; align-items: center; border-left: 1px solid var(--axis); }
+.hbars .bar { height: 14px; border-radius: 0 4px 4px 0; min-width: 2px; }
+.hbars .val { font-size: 12.5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.hbars .val small { color: var(--muted); margin-left: 6px; font-size: 11.5px; }
+.hbars .row:hover .bar, .hbars .row:focus-within .bar, .hbars .row.on .bar { filter: brightness(1.12) saturate(1.05); }
+.hbars .row.dim .bar { opacity: .35; }
+.hbars .row.on .name { font-weight: 600; }
+.sub-h { font-size: 12px; font-weight: 600; color: var(--ink-2); margin: 4px 0 6px; }
+.sub-h + .hbars { margin-bottom: 14px; }
+
+svg { display: block; overflow: visible; }
+svg text { font: 11.5px system-ui, -apple-system, "Segoe UI", sans-serif; fill: var(--muted); }
+svg .lbl { fill: var(--ink-2); font-weight: 600; }
+.band { cursor: default; }
+.band .hit { fill: transparent; }
+.band:hover .hit, .band:focus .hit { fill: var(--hover); }
+.cols.hovering .band:not(:hover):not(:focus) .seg { opacity: .55; }
+.cell { cursor: default; }
+.cell:hover, .cell:focus { stroke: var(--ink); stroke-width: 1.5px; }
+
+/* tables */
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; font-weight: 600; color: var(--ink-2); font-size: 12px; padding: 6px 8px; border-bottom: 1px solid var(--grid); white-space: nowrap; cursor: pointer; user-select: none; }
+th.r, td.r { text-align: right; }
+td { padding: 7px 8px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+td.num { white-space: nowrap; }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: var(--hover); }
+tbody tr.on { background: var(--sel); }
+.tablewrap { overflow-x: auto; }
+.pname { display: inline-flex; align-items: center; gap: 8px; }
+.pname .sw { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+.pill { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 99px; border: 1px solid var(--ring); color: var(--ink-2); }
+
+/* session list */
+.sess { border-top: 1px solid var(--grid); }
+.sess details { border-bottom: 1px solid var(--grid); }
+.sess summary { list-style: none; display: grid; grid-template-columns: 96px 46px minmax(110px, 180px) 84px 1fr; gap: 10px; padding: 8px 6px; cursor: pointer; align-items: baseline; font-size: 13px; }
+.sess summary::-webkit-details-marker { display: none; }
+.sess summary:hover { background: var(--hover); }
+.sess details[open] summary { background: var(--sel); }
+.sess .title { min-width: 0; }
+.sess .body { padding: 8px 12px 14px 112px; font-size: 13px; color: var(--ink-2); }
+.sess .body h4 { font-size: 12px; color: var(--ink); margin: 10px 0 4px; }
+.sess .body ul { margin: 0; padding-left: 18px; }
+.sess .body li { margin: 2px 0; }
+.sess .body a { color: var(--focus); word-break: break-all; }
+.more { margin-top: 10px; }
+code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--hover); padding: 0 4px; border-radius: 4px; }
+
+/* project detail */
+.pd-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 12px; }
+.pd-grid ul { margin: 0; padding-left: 18px; font-size: 13px; color: var(--ink-2); }
+.pd-grid li { margin: 3px 0; }
+.pd-top { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.pd-top h2 { font-size: 16px; }
+.pd-desc { font-size: 13px; color: var(--ink-2); margin: 6px 0 0; }
+.pd-links { font-size: 12.5px; margin-top: 6px; }
+.pd-links a { color: var(--focus); }
+
+/* tooltip */
+.tip { position: fixed; z-index: 50; pointer-events: none; background: var(--tip-bg); border: 1px solid var(--ring); border-radius: 8px; box-shadow: var(--shadow); padding: 8px 10px; font-size: 12.5px; min-width: 140px; max-width: 320px; opacity: 0; transition: opacity .08s; }
+.tip.show { opacity: 1; }
+.tip .tt { color: var(--ink-2); font-size: 12px; margin-bottom: 4px; }
+.tip .tr { display: flex; align-items: center; gap: 8px; margin: 2px 0; }
+.tip .key { width: 12px; height: 2px; border-radius: 1px; flex: none; }
+.tip .tr strong { font-weight: 650; font-variant-numeric: tabular-nums; }
+.tip .tr span.l { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tip .tf { color: var(--muted); font-size: 11.5px; margin-top: 4px; }
+
+.scale { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); margin-top: 8px; flex-wrap: wrap; }
+.scale i { width: 14px; height: 10px; border-radius: 2px; display: inline-block; }
+
+@media (max-width: 900px) {
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpis .hero { grid-column: 1 / -1; }
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .pd-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 600px) {
+  .sess summary { grid-template-columns: 84px 1fr auto; }
+  .sess summary .c-time { display: none; }
+  .sess summary .title { grid-column: 1 / -1; }
+  .sess .body { padding-left: 10px; }
+  .kpi.hero .value { font-size: 34px; }
+  .kpi .value { font-size: 21px; }
+  .search { width: 100%; }
+  header .meta { flex-basis: 100%; order: 3; }
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <header>
+    <h1 id="h1">Vault Memory</h1>
+    <div class="meta" id="meta"></div>
+    <div class="actions">
+      <button class="btn" id="refresh" type="button" data-i18n="refresh"></button>
+      <button class="btn" id="theme" type="button" data-i18n="theme" data-i18n-attr="aria-label:themeAria"></button>
+      <div class="seg lang" id="lang" role="group" data-i18n-attr="aria-label:language">
+        <button class="chip" type="button" data-lang="en" lang="en" aria-label="English">EN</button>
+        <button class="chip" type="button" data-lang="tr" lang="tr" aria-label="Türkçe">TR</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="banner" id="banner" role="status" hidden>
+    <svg class="ico" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5 18.5 17h-17z" fill="var(--warning)"/><rect x="9.1" y="7.5" width="1.8" height="5" rx=".9" fill="#0b0b0b"/><circle cx="10" cy="14.6" r="1" fill="#0b0b0b"/></svg>
+    <div id="bannerText"></div>
+  </div>
+
+  <div class="filters" role="group" data-i18n-attr="aria-label:filters">
+    <div class="seg" id="presets"></div>
+    <label class="field"><span data-i18n="from"></span> <input type="date" id="from"></label>
+    <label class="field"><span data-i18n="to"></span> <input type="date" id="to"></label>
+    <label class="field"><span data-i18n="project"></span> <select id="fproject"></select></label>
+    <label class="field"><span data-i18n="machine"></span> <select id="fmachine"></select></label>
+    <label class="field" id="toolField"><span data-i18n="tool"></span> <select id="ftool"></select></label>
+    <input class="search" type="search" id="q" data-i18n-attr="placeholder:searchPh,aria-label:searchPh">
+    <button class="btn" id="reset" type="button" data-i18n="reset"></button>
+  </div>
+
+  <section class="kpis" id="kpis"></section>
+
+  <section class="grid">
+    <div class="card span2" id="projectDetail" hidden></div>
+
+    <div class="card span2">
+      <div class="card-head"><h2 id="dailyTitle"></h2><span class="desc" id="dailyNote"></span></div>
+      <p class="desc" data-i18n="dailyDesc"></p>
+      <div class="legend" id="dailyLegend"></div>
+      <div id="daily"></div>
+    </div>
+
+    <div class="card">
+      <h2 data-i18n="byProject"></h2>
+      <p class="desc" data-i18n="byProjectDesc"></p>
+      <div id="byProject"></div>
+    </div>
+
+    <div class="card">
+      <h2 data-i18n="heat"></h2>
+      <p class="desc" data-i18n="heatDesc"></p>
+      <div id="heat"></div>
+    </div>
+
+    <div class="card">
+      <h2 data-i18n="dims"></h2>
+      <p class="desc" data-i18n="dimsDesc"></p>
+      <div id="dims"></div>
+    </div>
+
+    <div class="card">
+      <h2 data-i18n="hist"></h2>
+      <p class="desc" data-i18n="histDesc"></p>
+      <div id="hist"></div>
+    </div>
+
+    <div class="card span2">
+      <div class="card-head"><h2 data-i18n="projects"></h2><span class="desc" data-i18n="sortHint"></span></div>
+      <div class="tablewrap"><table id="ptable"></table></div>
+    </div>
+
+    <div class="card span2">
+      <div class="card-head">
+        <h2 data-i18n="sessions"></h2>
+        <div class="right"><span class="desc" id="sessCount"></span><button class="btn sm" id="csv" type="button" data-i18n="csv"></button></div>
+      </div>
+      <div class="sess" id="sessions"></div>
+    </div>
+  </section>
+</div>
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script>
+"use strict";
+// ---------- strings ----------
+const I18N = {
+  en: {
+    locale: "en-US", title: "Vault Memory", refresh: "Refresh", theme: "Theme", themeAria: "Toggle light and dark theme",
+    language: "Language", filters: "Filters", from: "From", to: "To", project: "Project", machine: "Machine", tool: "Tool",
+    all: "All", searchPh: "Search sessions…", reset: "Clear filters", reading: "Reading the vault…",
+    presets: { today: "Today", thisWeek: "This week", lastWeek: "Last week", last7: "Last 7 days", last30: "Last 30 days", thisMonth: "This month", all: "All" },
+    min: (m) => `${m} min`, hm: (h, m) => (m ? `${h} h ${String(m).padStart(2, "0")} min` : `${h} h`), hShort: (x) => `${x} h`,
+    noProject: "No project", otherProjects: "Other projects", today: "Today",
+    totalTime: "Total time", deltaVs: (n, arrow, pct, prev) => `${arrow} ${pct} vs the previous ${n} days (${prev})`,
+    noPrev: (n) => `No records in the previous ${n} days`,
+    records: "Session records", avg: (x) => `Average ${x}`, activeDays: "Active days", perActive: (x) => `${x} per active day`,
+    busiest: "Busiest day", projectsKpi: "Projects", top: (x) => `Top: ${x}`,
+    dailyTitle: "Daily working time", weeklyTitle: "Weekly working time",
+    dailyDesc: "Stacked by project. Hover a column for that day's breakdown; click a project in the legend to filter.",
+    dailyAria: (weekly) => `${weekly ? "Weekly" : "Daily"} working time by project`,
+    peak: (x) => `Peak: ${x}`, noData: "No records in this range.", legendOther: "Projects ranked 8th and lower", legendFocus: "Focus on this project",
+    weekOf: (d) => `Week of ${d}`, total: "total",
+    byProject: "By project", byProjectDesc: "Total time and share in the selected period. Click a project to focus on it.",
+    sessionRecords: "session records", activeDaysL: "active days", avgSession: "avg. session",
+    heat: "Weekday and hour", heatDesc: "Time is spread forward from each session's start, so it is approximate. The number on the right is the day's total.",
+    heatAria: "Working time by weekday and hour", noRecords: "No records", less: "Less", more: (x) => `More (up to ${x} per hour)`,
+    dims: "Machine and tool", dimsDesc: "Which machine and which agent the sessions ran on.",
+    weekdayWeekend: "Weekdays and weekend", weekdays: "Weekdays", weekend: "Weekend",
+    hist: "Session length", histDesc: "Session records by duration (number above each column: record count).", histAria: "Distribution of session length",
+    bins: ["< 15 min", "15–30 min", "30–60 min", "1–2 h", "2–4 h", "4 h+"], binsShort: ["<15m", "15–30m", "30–60m", "1–2h", "2–4h", "4h+"],
+    totalTimeL: "total time",
+    projects: "Projects", sortHint: "Click a column header to sort.",
+    cols: { title: "Project", minutes: "Time", share: "Share", n: "Sessions", active: "Active days", avg: "Avg. session", last: "Last worked" },
+    pageUpdated: (d) => `page updated ${d}`, clearFocus: "Clear focus", openInObsidian: "Open the project page in Obsidian", repos: "Repos",
+    openItems: "Open items", openFrom: (d, t) => `Open items · from the ${d} ${t} session`, noOpen: "No open items recorded in this period.",
+    openNote: "List saved in the latest session; some items may be closed by now.", recentDecisions: "Recent decisions",
+    noDecisions: "No decisions recorded in this period.",
+    sessions: "Sessions", sessCount: (n, q) => `${n} records${q ? ` · search "${q}"` : ""}`, noSessions: "No sessions match these filters.",
+    sec: { request: "Request", done: "Done", decisions: "Decisions", open: "Open items", other: "Other", source: "Source" },
+    showMore: (n) => `Show ${n} more`, csv: "Export CSV",
+    csvCols: ["date", "start", "project", "machine", "tool", "minutes", "title"],
+    meta: (v, a, b, n, t) => `Vault: ${v} · records ${a} – ${b} · ${n} session records · read at ${t}`,
+    metaDemo: "Demo data", workerLast: (t) => `worker log ${t}`, statusErr: "worker status unavailable",
+    pending: (n, r) => `${n} session${n === 1 ? "" : "s"} not in the vault yet${r ? ` (${r} ready to process)` : ""}; they show up here once processed.`,
+    backfill: (n) => `${n} older session file${n === 1 ? "" : "s"} queued for backfill.`,
+    mismatch: (w) => `${w.file}: entry headings add up to ${w.entries} min, the file total is ${w.frontmatter} min.`,
+    mismatchHead: "Time mismatch", loadErr: (m) => `Could not load data: ${m}. Is the dashboard server running? (vm dashboard)`,
+    status: { active: "active", paused: "paused", done: "done" },
+  },
+  tr: {
+    locale: "tr-TR", title: "Çalışma Panosu", refresh: "Yenile", theme: "Tema", themeAria: "Açık ve koyu tema arasında geçiş yap",
+    language: "Dil", filters: "Filtreler", from: "Başlangıç", to: "Bitiş", project: "Proje", machine: "Makine", tool: "Araç",
+    all: "Tümü", searchPh: "Oturumlarda ara…", reset: "Filtreleri temizle", reading: "Vault okunuyor…",
+    presets: { today: "Bugün", thisWeek: "Bu hafta", lastWeek: "Geçen hafta", last7: "Son 7 gün", last30: "Son 30 gün", thisMonth: "Bu ay", all: "Tümü" },
+    min: (m) => `${m} dk`, hm: (h, m) => (m ? `${h} sa ${String(m).padStart(2, "0")} dk` : `${h} sa`), hShort: (x) => `${x} sa`,
+    noProject: "Projesiz oturumlar", otherProjects: "Diğer projeler", today: "Bugün",
+    totalTime: "Toplam süre", deltaVs: (n, arrow, pct, prev) => `Önceki ${n} güne göre ${arrow} ${pct} (${prev})`,
+    noPrev: (n) => `Önceki ${n} günde kayıt yok`,
+    records: "Oturum kaydı", avg: (x) => `Ortalama ${x}`, activeDays: "Aktif gün", perActive: (x) => `Aktif gün başına ${x}`,
+    busiest: "En yoğun gün", projectsKpi: "Proje", top: (x) => `En çok: ${x}`,
+    dailyTitle: "Günlük çalışma süresi", weeklyTitle: "Haftalık çalışma süresi",
+    dailyDesc: "Projelere göre yığılmış; bir sütunun üzerine gelince o günün dökümü çıkar. Lejanttaki projeye tıklayınca filtrelenir.",
+    dailyAria: (weekly) => `${weekly ? "Haftalık" : "Günlük"} çalışma süresi, projelere göre`,
+    peak: (x) => `En yüksek: ${x}`, noData: "Bu aralıkta kayıt yok.", legendOther: "8. sıradan sonraki projeler", legendFocus: "Bu projeye odaklan",
+    weekOf: (d) => `${d} haftası`, total: "toplam",
+    byProject: "Proje bazında", byProjectDesc: "Seçili dönemdeki toplam süre ve payı. Tıklayınca o projeye odaklanır.",
+    sessionRecords: "oturum kaydı", activeDaysL: "aktif gün", avgSession: "ortalama oturum",
+    heat: "Haftanın günü ve saat", heatDesc: "Süre, oturum başlangıç saatinden ileriye yayılarak yaklaşık hesaplanır. Sağdaki sayı o günün toplamı.",
+    heatAria: "Haftanın günü ve saate göre çalışma süresi", noRecords: "Kayıt yok", less: "Az", more: (x) => `Çok (saat başına en fazla ${x})`,
+    dims: "Makine ve araç", dimsDesc: "Oturumların hangi makinede ve hangi ajanla yapıldığı.",
+    weekdayWeekend: "Hafta içi ve hafta sonu", weekdays: "Hafta içi", weekend: "Hafta sonu",
+    hist: "Oturum uzunluğu", histDesc: "Oturum kayıtlarının süreye göre dağılımı (sütun üstü: kayıt sayısı).", histAria: "Oturum uzunluğu dağılımı",
+    bins: ["< 15 dk", "15–30 dk", "30–60 dk", "1–2 sa", "2–4 sa", "4 sa+"], binsShort: ["<15", "15–30", "30–60", "1–2s", "2–4s", "4s+"],
+    totalTimeL: "toplam süre",
+    projects: "Projeler", sortHint: "Sütun başlığına tıklayınca sıralanır.",
+    cols: { title: "Proje", minutes: "Süre", share: "Pay", n: "Oturum", active: "Aktif gün", avg: "Ort. oturum", last: "Son çalışma" },
+    pageUpdated: (d) => `sayfa güncellendi: ${d}`, clearFocus: "Odağı kaldır", openInObsidian: "Proje sayfasını Obsidian'da aç", repos: "Depolar",
+    openItems: "Açık işler", openFrom: (d, t) => `Açık işler · ${d} ${t} oturumundan`, noOpen: "Bu aralıkta açık iş kaydı yok.",
+    openNote: "En son oturumda kaydedilen liste; sonradan kapanmış olabilir.", recentDecisions: "Son kararlar",
+    noDecisions: "Bu aralıkta karar kaydı yok.",
+    sessions: "Oturumlar", sessCount: (n, q) => `${n} kayıt${q ? ` · "${q}" araması` : ""}`, noSessions: "Bu filtrelerle oturum yok.",
+    sec: { request: "İstek", done: "Yapılanlar", decisions: "Kararlar", open: "Açık işler", other: "Diğer", source: "Kaynak" },
+    showMore: (n) => `${n} kayıt daha göster`, csv: "CSV indir",
+    csvCols: ["tarih", "başlangıç", "proje", "makine", "araç", "dakika", "başlık"],
+    meta: (v, a, b, n, t) => `Vault: ${v} · kayıtlar ${a} – ${b} · ${n} oturum kaydı · okundu ${t}`,
+    metaDemo: "Örnek veri", workerLast: (t) => `işçi kaydı ${t}`, statusErr: "işçi durumu alınamadı",
+    pending: (n, r) => `${n} oturum henüz vault'a işlenmedi${r ? ` (${r} tanesi işlenmeye hazır)` : ""}; işlendikçe panoya kendiliğinden düşer.`,
+    backfill: (n) => `Geçmiş kuyruğunda ${n} oturum dosyası var.`,
+    mismatch: (w) => `${w.file}: başlıklardaki süre ${w.entries} dk, dosya özeti ${w.frontmatter} dk.`,
+    mismatchHead: "Süre uyuşmazlığı", loadErr: (m) => `Veri alınamadı: ${m}. Pano sunucusu çalışıyor mu? (vm dashboard)`,
+    status: { active: "aktif", paused: "beklemede", done: "bitti" },
+  },
+};
+const STATUS_KEYS = { active: "active", aktif: "active", paused: "paused", beklemede: "paused", done: "done", bitti: "done" };
+const OLD_PRESETS = { bugun: "today", buhafta: "thisWeek", gecenhafta: "lastWeek", son7: "last7", son30: "last30", buay: "thisMonth", tumu: "all" };
+const PRESET_KEYS = ["today", "thisWeek", "lastWeek", "last7", "last30", "thisMonth", "all"];
+const PREF_KEY = "vaultMemoryDashboard";
+let LANG = "en";
+const L = () => I18N[LANG];
+function T(key, ...args) {
+  const v = key in L() ? L()[key] : I18N.en[key];
+  return typeof v === "function" ? v(...args) : v;
+}
+
+// ---------- helpers ----------
+const $ = (id) => document.getElementById(id);
+const SVGNS = "http://www.w3.org/2000/svg";
+const pad = (n) => String(n).padStart(2, "0");
+const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const parseISO = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+const addDays = (s, n) => { const d = parseISO(s); d.setDate(d.getDate() + n); return iso(d); };
+const weekday = (s) => (parseISO(s).getDay() + 6) % 7; // Monday = 0
+const daysBetween = (a, b) => Math.round((parseISO(b) - parseISO(a)) / 86400000);
+const mondayOf = (s) => addDays(s, -weekday(s));
+const today = () => iso(new Date());
+let FMT = {};
+function buildFormatters() {
+  const loc = L().locale;
+  const f = (o) => new Intl.DateTimeFormat(loc, o);
+  const wd = (o) => Array.from({ length: 7 }, (_, i) => f(o).format(new Date(2024, 0, 1 + i))); // 2024-01-01 is a Monday
+  FMT = {
+    short: f({ day: "numeric", month: "short" }), long: f({ weekday: "long", day: "numeric", month: "long" }),
+    wd: wd({ weekday: "short" }), wdFull: wd({ weekday: "long" }),
+    num: new Intl.NumberFormat(loc), dec1: new Intl.NumberFormat(loc, { maximumFractionDigits: 1 }),
+  };
+}
+const shortDate = (s) => (s ? FMT.short.format(parseISO(s)) : "—");
+const longDate = (s) => FMT.long.format(parseISO(s));
+const nf = (n) => FMT.num.format(n);
+function fmtMin(m) {
+  m = Math.round(m);
+  if (m < 60) return L().min(m);
+  return L().hm(Math.floor(m / 60), m % 60);
+}
+const fmtHours = (m) => L().hShort(FMT.dec1.format(m / 60));
+const fmtPct = (x) => new Intl.NumberFormat(L().locale, { style: "percent", maximumFractionDigits: x < 0.1 ? 1 : 0 }).format(x);
+// Case- and accent-insensitive search that treats Turkish İ/ı like i.
+const fold = (s) => (s || "").toLocaleLowerCase("tr-TR").normalize("NFD").replace(/\p{M}/gu, "").replace(/ı/g, "i");
+
+function el(tag, attrs, ...kids) {
+  const n = document.createElement(tag);
+  if (attrs) for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === "class") n.className = v;
+    else if (k === "style") n.setAttribute("style", v);
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+    else n.setAttribute(k, v === true ? "" : v);
+  }
+  for (const k of kids.flat()) if (k != null && k !== false) n.append(k instanceof Node ? k : document.createTextNode(String(k)));
+  return n;
+}
+function sv(tag, attrs, parent) {
+  const n = document.createElementNS(SVGNS, tag);
+  if (attrs) for (const [k, v] of Object.entries(attrs)) if (v != null) n.setAttribute(k, v);
+  if (parent) parent.appendChild(n);
+  return n;
+}
+const topRounded = (x, y, w, h, r) => {
+  r = Math.max(0, Math.min(r, w / 2, h));
+  return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+};
+function niceStep(max, maxTicks) {
+  const steps = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50, 60, 80, 100, 150, 200, 250, 300, 400, 500];
+  for (const s of steps) if (max / s <= maxTicks) return s;
+  return Math.ceil(max / maxTicks);
+}
+
+// ---------- tooltip ----------
+const tip = $("tip");
+function showTip(evOrEl, title, rows, foot) {
+  tip.replaceChildren();
+  if (title) tip.append(el("div", { class: "tt" }, title));
+  for (const r of rows) {
+    tip.append(el("div", { class: "tr" },
+      r.color ? el("span", { class: "key", style: `background:${r.color}` }) : null,
+      el("strong", null, r.value), r.label ? el("span", { class: "l" }, r.label) : null));
+  }
+  if (foot) tip.append(el("div", { class: "tf" }, foot));
+  let x, y;
+  if (evOrEl instanceof Event && "clientX" in evOrEl) { x = evOrEl.clientX; y = evOrEl.clientY; }
+  else { const b = (evOrEl.target || evOrEl).getBoundingClientRect(); x = b.left + b.width / 2; y = b.top; }
+  tip.classList.add("show");
+  const tw = tip.offsetWidth, th = tip.offsetHeight;
+  let left = x + 14, top = y + 14;
+  if (left + tw > innerWidth - 8) left = x - tw - 14;
+  if (top + th > innerHeight - 8) top = y - th - 14;
+  tip.style.left = Math.max(8, left) + "px";
+  tip.style.top = Math.max(8, top) + "px";
+}
+const hideTip = () => tip.classList.remove("show");
+function hoverable(node, fn) {
+  node.addEventListener("pointermove", (e) => fn(e));
+  node.addEventListener("pointerleave", hideTip);
+  node.addEventListener("focus", (e) => fn(e));
+  node.addEventListener("blur", hideTip);
+}
+
+// ---------- state ----------
+let DATA = null, STATUS = null, COLORS = {}, ORDER = [], LANG_SAVED = "";
+const st = { preset: "thisMonth", from: "", to: "", project: "", machine: "", tool: "", q: "", sort: { key: "minutes", dir: -1 }, shown: 40 };
+function readStore(key) {
+  try { return JSON.parse(localStorage.getItem(key) || "null"); } catch (e) { return null; }
+}
+function loadPrefs() {
+  const p = readStore(PREF_KEY) || readStore("vaultPano") || {};
+  for (const k of ["preset", "from", "to", "project", "machine", "tool"]) if (typeof p[k] === "string") st[k] = p[k];
+  st.preset = OLD_PRESETS[st.preset] || st.preset;
+  if (st.preset && !PRESET_KEYS.includes(st.preset)) st.preset = "thisMonth";
+  if (st.project === "genel") st.project = "_none";
+  if (p.theme === "light" || p.theme === "dark") document.documentElement.dataset.theme = p.theme;
+  if (p.lang === "en" || p.lang === "tr") LANG_SAVED = p.lang;
+}
+function savePrefs() {
+  try {
+    localStorage.setItem(PREF_KEY, JSON.stringify({
+      preset: st.preset, from: st.from, to: st.to, project: st.project, machine: st.machine, tool: st.tool,
+      theme: document.documentElement.dataset.theme || "", lang: LANG_SAVED,
+    }));
+  } catch (e) { /* storage unavailable: keep defaults */ }
+}
+function pickLang() {
+  if (LANG_SAVED) return LANG_SAVED;
+  if (DATA && (DATA.lang === "en" || DATA.lang === "tr")) return DATA.lang;
+  return (navigator.language || "").toLowerCase().startsWith("tr") ? "tr" : "en";
+}
+function dataBounds() {
+  const ds = DATA.days.map((d) => d.date).filter(Boolean).sort();
+  return { min: ds[0] || today(), max: ds[ds.length - 1] || today() };
+}
+function presetRange(p) {
+  const t = today(), b = dataBounds();
+  switch (p) {
+    case "today": return [t, t];
+    case "thisWeek": return [mondayOf(t), t];
+    case "lastWeek": { const m = mondayOf(t); return [addDays(m, -7), addDays(m, -1)]; }
+    case "last7": return [addDays(t, -6), t];
+    case "last30": return [addDays(t, -29), t];
+    case "thisMonth": return [t.slice(0, 8) + "01", t];
+    case "all": return [b.min < t ? b.min : t, b.max > t ? b.max : t];
+  }
+  return null;
+}
+function applyPreset() {
+  const r = presetRange(st.preset);
+  if (r) [st.from, st.to] = r;
+  if (!st.from || !st.to) [st.from, st.to] = presetRange("thisMonth");
+  if (st.from > st.to) [st.from, st.to] = [st.to, st.from];
+}
+
+// ---------- data ----------
+function prepare(data) {
+  for (const s of data.sessions) {
+    s._text = fold([s.title, s.request, ...(s.done || []), ...(s.decisions || []), ...(s.open || []), ...(s.other || []),
+      s.project, (data.projects[s.project] || {}).title].join(" "));
+  }
+  // A colour belongs to the project, not to its rank in the current view: assigned once by all-time total.
+  const tot = {};
+  for (const s of data.sessions) tot[s.project] = (tot[s.project] || 0) + s.minutes;
+  const ranked = Object.keys(tot).sort((a, b) => tot[b] - tot[a]);
+  COLORS = {}; ORDER = [];
+  ranked.forEach((p, i) => {
+    if (i < 7) { COLORS[p] = `var(--s${i + 1})`; ORDER.push(p); }
+    else COLORS[p] = "var(--other)";
+  });
+  data._ranked = ranked;
+  return data;
+}
+const groupOf = (p) => (ORDER.includes(p) ? p : "__other");
+const groupColor = (g) => (g === "__other" ? "var(--other)" : COLORS[g]);
+function projTitle(p) {
+  if (p === "__other") return T("otherProjects");
+  if (p === "_none") return T("noProject");
+  return (DATA.projects[p] && DATA.projects[p].title) || p;
+}
+const shortTitle = (p) => {
+  const t = projTitle(p);
+  return t.length > 28 ? t.replace(/\s*\(.*\)\s*$/, "") : t;
+};
+const statusKey = (s) => STATUS_KEYS[(s || "").toLowerCase()] || "";
+const statusLabel = (s) => (statusKey(s) ? L().status[statusKey(s)] : s);
+
+function filtered(from = st.from, to = st.to) {
+  const q = fold(st.q.trim());
+  return DATA.sessions.filter((s) => s.date >= from && s.date <= to
+    && (!st.project || s.project === st.project)
+    && (!st.machine || s.machine === st.machine)
+    && (!st.tool || s.tool === st.tool)
+    && (!q || s._text.includes(q)));
+}
+const sum = (arr, f) => arr.reduce((a, x) => a + f(x), 0);
+
+// ---------- static text and language ----------
+function applyStatic() {
+  document.documentElement.lang = LANG;
+  document.title = T("title");
+  $("h1").textContent = T("title");
+  for (const n of document.querySelectorAll("[data-i18n]")) n.textContent = T(n.dataset.i18n);
+  for (const n of document.querySelectorAll("[data-i18n-attr]")) {
+    for (const pair of n.dataset.i18nAttr.split(",")) {
+      const [attr, key] = pair.split(":");
+      n.setAttribute(attr, T(key));
+    }
+  }
+  for (const b of $("lang").children) b.setAttribute("aria-pressed", String(b.dataset.lang === LANG));
+}
+function setLang(lang, remember) {
+  LANG = lang === "tr" ? "tr" : "en";
+  if (remember) LANG_SAVED = LANG;
+  buildFormatters();
+  applyStatic();
+  if (DATA && st.from) { buildFilters(); render(); } else savePrefs();
+}
+
+// ---------- filters ----------
+function buildFilters() {
+  const seg = $("presets"); seg.replaceChildren();
+  for (const k of PRESET_KEYS) {
+    seg.append(el("button", {
+      class: "chip", type: "button", "aria-pressed": String(st.preset === k), "data-preset": k,
+      onclick: () => { st.preset = k; applyPreset(); render(); },
+    }, L().presets[k]));
+  }
+  const fillSelect = (sel, items, val) => {
+    sel.replaceChildren(el("option", { value: "" }, T("all")));
+    for (const [v, label] of items) sel.append(el("option", { value: v }, label));
+    sel.value = items.some(([v]) => v === val) ? val : "";
+  };
+  fillSelect($("fproject"), DATA._ranked.map((p) => [p, projTitle(p)]), st.project);
+  const machines = [...new Set(DATA.days.map((d) => d.machine))].sort();
+  fillSelect($("fmachine"), machines.map((m) => [m, m]), st.machine);
+  const tools = [...new Set(DATA.sessions.map((s) => s.tool))].sort();
+  fillSelect($("ftool"), tools.map((t) => [t, t]), st.tool);
+  $("toolField").hidden = tools.length < 2 && !st.tool;
+  st.project = $("fproject").value; st.machine = $("fmachine").value; st.tool = $("ftool").value;
+  $("from").value = st.from; $("to").value = st.to;
+  $("q").value = st.q;
+}
+function syncFilterUI() {
+  for (const b of $("presets").children) b.setAttribute("aria-pressed", String(b.dataset.preset === st.preset));
+  $("from").value = st.from; $("to").value = st.to;
+  $("fproject").value = st.project; $("fmachine").value = st.machine; $("ftool").value = st.tool;
+}
+function setProject(p) { st.project = st.project === p ? "" : p; st.shown = 40; render(); }
+
+// ---------- KPI tiles ----------
+function renderKpis(rows) {
+  const box = $("kpis"); box.replaceChildren();
+  const total = sum(rows, (s) => s.minutes);
+  const nDays = daysBetween(st.from, st.to) + 1;
+  const byDay = {};
+  for (const s of rows) byDay[s.date] = (byDay[s.date] || 0) + s.minutes;
+  const active = Object.keys(byDay).length;
+  let best = null;
+  for (const [d, m] of Object.entries(byDay)) if (!best || m > best[1]) best = [d, m];
+  const prevTo = addDays(st.from, -1), prevFrom = addDays(st.from, -nDays);
+  const prevTotal = sum(filtered(prevFrom, prevTo), (s) => s.minutes);
+  let delta = "";
+  if (prevTotal > 0) {
+    const ch = (total - prevTotal) / prevTotal;
+    delta = T("deltaVs", nDays, ch >= 0 ? "▲" : "▼", fmtPct(Math.abs(ch)), fmtMin(prevTotal));
+  } else if (DATA.days.length) {
+    delta = T("noPrev", nDays);
+  }
+  const tile = (cls, label, value, sub) => el("div", { class: `card kpi ${cls || ""}` },
+    el("div", { class: "label" }, label), el("div", { class: "value" }, value), sub ? el("div", { class: "sub" }, sub) : null);
+  box.append(
+    tile("hero", T("totalTime"), fmtMin(total), delta),
+    tile("", T("records"), nf(rows.length), rows.length ? T("avg", fmtMin(total / rows.length)) : "—"),
+    tile("", T("activeDays"), `${nf(active)} / ${nf(nDays)}`, active ? T("perActive", fmtMin(total / active)) : "—"),
+    tile("", T("busiest"), best ? fmtMin(best[1]) : "—", best ? longDate(best[0]) : ""),
+    tile("", T("projectsKpi"), nf(new Set(rows.map((s) => s.project)).size), rows.length ? T("top", shortTitle(topProject(rows))) : "—"),
+  );
+}
+function topProject(rows) {
+  const t = {};
+  for (const s of rows) t[s.project] = (t[s.project] || 0) + s.minutes;
+  return Object.keys(t).sort((a, b) => t[b] - t[a])[0];
+}
+
+// ---------- daily stacked columns ----------
+function renderDaily(rows) {
+  const host = $("daily"); host.replaceChildren();
+  const nDays = daysBetween(st.from, st.to) + 1;
+  const weekly = nDays > 62;
+  $("dailyTitle").textContent = weekly ? T("weeklyTitle") : T("dailyTitle");
+  const keys = [];
+  if (weekly) { for (let d = mondayOf(st.from); d <= st.to; d = addDays(d, 7)) keys.push(d); }
+  else { for (let d = st.from; d <= st.to; d = addDays(d, 1)) keys.push(d); }
+  const idx = Object.fromEntries(keys.map((k, i) => [k, i]));
+  const buckets = keys.map((k) => ({ key: k, total: 0, by: {} }));
+  for (const s of rows) {
+    const k = weekly ? mondayOf(s.date) : s.date;
+    const b = buckets[idx[k]];
+    if (!b) continue;
+    const g = groupOf(s.project);
+    b.by[g] = (b.by[g] || 0) + s.minutes; b.total += s.minutes;
+  }
+  const groups = [...ORDER, "__other"].filter((g) => buckets.some((b) => b.by[g]));
+  const leg = $("dailyLegend"); leg.replaceChildren();
+  if (groups.length > 1 || (groups.length === 1 && !st.project)) {
+    for (const g of groups) {
+      leg.append(el("button", {
+        type: "button", "aria-pressed": String(st.project === g),
+        onclick: () => { if (g !== "__other") setProject(g); }, title: g === "__other" ? T("legendOther") : T("legendFocus"),
+      }, el("span", { class: "sw", style: `background:${groupColor(g)}` }), shortTitle(g)));
+    }
+  }
+  const maxM = Math.max(0, ...buckets.map((b) => b.total));
+  $("dailyNote").textContent = maxM ? T("peak", fmtMin(maxM)) : "";
+  if (!maxM) { host.append(el("div", { class: "empty" }, T("noData"))); return; }
+
+  const W = Math.max(280, host.clientWidth), H = 250, m = { l: 44, r: 6, t: 18, b: 24 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const maxH = maxM / 60, step = niceStep(maxH, 5), top = Math.ceil(maxH / step) * step || step;
+  const y = (min) => m.t + ih - (min / 60) / top * ih;
+  const svg = sv("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}`, class: "cols", role: "img", "aria-label": T("dailyAria", weekly) });
+  for (let v = 0; v <= top + 1e-9; v += step) {
+    const yy = y(v * 60);
+    sv("line", { x1: m.l, x2: W - m.r, y1: yy, y2: yy, stroke: v === 0 ? "var(--axis)" : "var(--grid)", "stroke-width": 1, "shape-rendering": "crispEdges" }, svg);
+    const t = sv("text", { x: m.l - 6, y: yy + 4, "text-anchor": "end", class: "num" }, svg); t.textContent = L().hShort(nf(v));
+  }
+  const band = iw / keys.length, bw = Math.max(2, Math.min(24, band * 0.68));
+  const every = Math.max(1, Math.ceil(50 / band));
+  const tIdx = keys.indexOf(today());
+  buckets.forEach((b, i) => {
+    const gx = m.l + i * band;
+    const g = sv("g", { class: "band", tabindex: b.total ? 0 : -1 }, svg);
+    sv("rect", { class: "hit", x: gx, y: m.t, width: band, height: ih, rx: 3 }, g);
+    const x = gx + (band - bw) / 2;
+    let y0 = y(0);
+    const present = groups.filter((gr) => b.by[gr]);
+    present.forEach((gr, j) => {
+      const hpx = b.by[gr] / 60 / top * ih;
+      const isTop = j === present.length - 1;
+      if (isTop) sv("path", { class: "seg", d: topRounded(x, y0 - hpx, bw, hpx, 4), style: `fill:${groupColor(gr)}` }, g);
+      else if (hpx > 2) sv("rect", { class: "seg", x, y: y0 - hpx + 2, width: bw, height: hpx - 2, style: `fill:${groupColor(gr)}` }, g);
+      y0 -= hpx;
+    });
+    if (b.total === maxM) {
+      const t = sv("text", { x: gx + band / 2, y: y(b.total) - 6, "text-anchor": "middle", class: "lbl num" }, svg);
+      t.textContent = fmtMin(b.total);
+    }
+    const nearToday = tIdx >= 0 && i !== tIdx && Math.abs(i - tIdx) < every;
+    if ((i % every === 0 && !nearToday) || i === tIdx) {
+      const t = sv("text", { x: gx + band / 2, y: H - 6, "text-anchor": "middle" }, svg);
+      t.textContent = i === tIdx && !weekly ? T("today") : shortDate(b.key);
+      if (i === tIdx) t.setAttribute("class", "lbl");
+    }
+    hoverable(g, (e) => {
+      if (!b.total) { hideTip(); return; }
+      const list = groups.filter((gr) => b.by[gr]).sort((a, c) => b.by[c] - b.by[a]);
+      const title = weekly ? T("weekOf", shortDate(b.key)) : longDate(b.key);
+      showTip(e, title, [{ value: fmtMin(b.total), label: T("total") },
+        ...list.map((gr) => ({ color: groupColor(gr), value: fmtMin(b.by[gr]), label: shortTitle(gr) }))]);
+    });
+  });
+  svg.addEventListener("pointerenter", () => svg.classList.add("hovering"));
+  svg.addEventListener("pointerleave", () => svg.classList.remove("hovering"));
+  host.append(svg);
+}
+
+// ---------- horizontal bars ----------
+function hbars(items, opts = {}) {
+  const max = Math.max(0, ...items.map((i) => i.value));
+  const total = opts.total || sum(items, (i) => i.value);
+  const box = el("div", { class: "hbars" });
+  for (const it of items) {
+    const row = el("div", { class: `row${it.on ? " on" : ""}${it.dim ? " dim" : ""}`, tabindex: 0, role: opts.onPick ? "button" : null,
+      onclick: opts.onPick ? () => opts.onPick(it.key) : null,
+      onkeydown: opts.onPick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); opts.onPick(it.key); } } : null },
+      el("div", { class: "name", title: it.label }, it.label),
+      el("div", { class: "track" }, el("div", { class: "bar", style: `width:${max ? (it.value / max * 100).toFixed(2) : 0}%;background:${it.color}` })),
+      el("div", { class: "val" }, fmtMin(it.value), el("small", null, total ? fmtPct(it.value / total) : "")));
+    if (it.tip) hoverable(row, (e) => showTip(e, it.label, it.tip()));
+    box.append(row);
+  }
+  return box;
+}
+function renderByProject(rows) {
+  const host = $("byProject"); host.replaceChildren();
+  const agg = {};
+  for (const s of rows) {
+    const a = agg[s.project] || (agg[s.project] = { m: 0, n: 0, days: new Set() });
+    a.m += s.minutes; a.n += 1; a.days.add(s.date);
+  }
+  const keys = Object.keys(agg).sort((a, b) => agg[b].m - agg[a].m);
+  if (!keys.length) { host.append(el("div", { class: "empty" }, T("noData"))); return; }
+  host.append(hbars(keys.map((p) => ({
+    key: p, label: projTitle(p), value: agg[p].m, color: COLORS[p] || "var(--other)", on: st.project === p,
+    tip: () => [{ color: COLORS[p], value: fmtMin(agg[p].m), label: T("total") },
+      { value: nf(agg[p].n), label: T("sessionRecords") }, { value: nf(agg[p].days.size), label: T("activeDaysL") },
+      { value: fmtMin(agg[p].m / agg[p].n), label: T("avgSession") }],
+  })), { onPick: setProject }));
+}
+
+// ---------- heatmap ----------
+function renderHeat(rows) {
+  const host = $("heat"); host.replaceChildren();
+  const grid = Array.from({ length: 7 }, () => Array(24).fill(0));
+  for (const s of rows) {
+    if (!s.start) continue;
+    const [h, mi] = s.start.split(":").map(Number);
+    let wd = weekday(s.date), t = h * 60 + mi, left = s.minutes;
+    while (left > 0) {
+      const hour = Math.floor(t / 60) % 24, take = Math.min(60 - (t % 60), left);
+      grid[wd][hour] += take; left -= take; t += take;
+      if (t >= 1440) { t -= 1440; wd = (wd + 1) % 7; }
+    }
+  }
+  const max = Math.max(0, ...grid.flat());
+  if (!max) { host.append(el("div", { class: "empty" }, T("noData"))); return; }
+  const W = Math.max(280, host.clientWidth), lw = 38, rw = 62, ch = 22, gap = 2, top = 4;
+  const cw = (W - lw - rw) / 24;
+  const H = top + 7 * (ch + gap) + 20;
+  const svg = sv("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": T("heatAria") });
+  const qOf = (v) => (v <= 0 ? "var(--cell-empty)" : `var(--q${Math.min(7, Math.max(1, Math.ceil(v / max * 7)))})`);
+  for (let d = 0; d < 7; d++) {
+    const yy = top + d * (ch + gap);
+    const lt = sv("text", { x: 0, y: yy + ch / 2 + 4 }, svg); lt.textContent = FMT.wd[d];
+    for (let h = 0; h < 24; h++) {
+      const v = grid[d][h];
+      const c = sv("rect", { class: "cell", x: lw + h * cw + gap / 2, y: yy, width: Math.max(1, cw - gap), height: ch, rx: 3,
+        style: `fill:${qOf(v)}`, tabindex: v ? 0 : -1 }, svg);
+      hoverable(c, (e) => showTip(e, `${FMT.wdFull[d]} ${pad(h)}:00–${pad((h + 1) % 24)}:00`, [{ value: v ? fmtMin(v) : T("noRecords") }]));
+    }
+    const tot = sum(grid[d], (x) => x);
+    const tt = sv("text", { x: W, y: yy + ch / 2 + 4, "text-anchor": "end", class: tot ? "lbl num" : "num" }, svg);
+    tt.textContent = !tot ? "—" : tot < 60 ? L().min(tot) : fmtHours(tot);
+  }
+  for (let h = 0; h < 24; h += 3) {
+    const t = sv("text", { x: lw + h * cw + cw / 2, y: H - 4, "text-anchor": "middle", class: "num" }, svg);
+    t.textContent = pad(h);
+  }
+  host.append(svg);
+  const scale = el("div", { class: "scale" }, T("less"));
+  for (let i = 1; i <= 7; i++) scale.append(el("i", { style: `background:var(--q${i})` }));
+  scale.append(T("more", fmtMin(max)));
+  host.append(scale);
+}
+
+// ---------- machine and tool ----------
+function renderDims(rows) {
+  const host = $("dims"); host.replaceChildren();
+  if (!rows.length) { host.append(el("div", { class: "empty" }, T("noData"))); return; }
+  const block = (title, key, stateKey) => {
+    const agg = {};
+    for (const s of rows) { const a = agg[s[key]] || (agg[s[key]] = { m: 0, n: 0 }); a.m += s.minutes; a.n += 1; }
+    const ks = Object.keys(agg).sort((a, b) => agg[b].m - agg[a].m);
+    host.append(el("div", { class: "sub-h" }, title));
+    host.append(hbars(ks.map((k) => ({
+      key: k, label: k, value: agg[k].m, color: "var(--neutral-bar)", on: st[stateKey] === k,
+      tip: () => [{ value: fmtMin(agg[k].m), label: T("total") }, { value: nf(agg[k].n), label: T("sessionRecords") }],
+    })), { onPick: (k) => { st[stateKey] = st[stateKey] === k ? "" : k; render(); } }));
+  };
+  block(T("machine"), "machine", "machine");
+  block(T("tool"), "tool", "tool");
+  let wk = 0, we = 0;
+  for (const s of rows) (weekday(s.date) >= 5 ? (we += s.minutes) : (wk += s.minutes));
+  host.append(el("div", { class: "sub-h" }, T("weekdayWeekend")));
+  host.append(hbars([
+    { key: "wk", label: T("weekdays"), value: wk, color: "var(--neutral-bar)" },
+    { key: "we", label: T("weekend"), value: we, color: "var(--neutral-bar)" },
+  ]));
+}
+
+// ---------- session length ----------
+function renderHist(rows) {
+  const host = $("hist"); host.replaceChildren();
+  const edges = [[0, 15], [15, 30], [30, 60], [60, 120], [120, 240], [240, Infinity]];
+  const bins = edges.map(([a, b], i) => ({ l: L().bins[i], ls: L().binsShort[i], n: 0, m: 0, a, b }));
+  for (const s of rows) { const bin = bins.find((x) => s.minutes >= x.a && s.minutes < x.b); bin.n += 1; bin.m += s.minutes; }
+  const maxN = Math.max(0, ...bins.map((b) => b.n));
+  if (!maxN) { host.append(el("div", { class: "empty" }, T("noData"))); return; }
+  const W = Math.max(260, host.clientWidth), H = 200, m = { l: 6, r: 6, t: 20, b: 24 };
+  const ih = H - m.t - m.b, band = (W - m.l - m.r) / bins.length, bw = Math.min(24, band * 0.6);
+  const svg = sv("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": T("histAria") });
+  sv("line", { x1: m.l, x2: W - m.r, y1: m.t + ih, y2: m.t + ih, stroke: "var(--axis)", "shape-rendering": "crispEdges" }, svg);
+  bins.forEach((b, i) => {
+    const gx = m.l + i * band, h = b.n / maxN * ih, x = gx + (band - bw) / 2;
+    const g = sv("g", { class: "band", tabindex: b.n ? 0 : -1 }, svg);
+    sv("rect", { class: "hit", x: gx, y: m.t - 16, width: band, height: ih + 16, rx: 3 }, g);
+    if (b.n) sv("path", { d: topRounded(x, m.t + ih - h, bw, h, 4), style: "fill:var(--neutral-bar)" }, g);
+    const v = sv("text", { x: gx + band / 2, y: m.t + ih - h - 6, "text-anchor": "middle", class: "lbl num" }, g); v.textContent = b.n ? nf(b.n) : "";
+    const l = sv("text", { x: gx + band / 2, y: H - 6, "text-anchor": "middle" }, svg);
+    l.textContent = band < 72 ? b.ls : b.l;
+    hoverable(g, (e) => showTip(e, b.l, [{ value: nf(b.n), label: T("sessionRecords") }, { value: fmtMin(b.m), label: T("totalTimeL") }]));
+  });
+  host.append(svg);
+}
+
+// ---------- project table ----------
+function renderProjectTable(rows) {
+  const t = $("ptable"); t.replaceChildren();
+  const agg = {};
+  for (const s of rows) {
+    const a = agg[s.project] || (agg[s.project] = { p: s.project, minutes: 0, n: 0, days: new Set(), last: "" });
+    a.minutes += s.minutes; a.n += 1; a.days.add(s.date); if (s.date > a.last) a.last = s.date;
+  }
+  const total = sum(Object.values(agg), (a) => a.minutes);
+  const list = Object.values(agg).map((a) => ({ ...a, active: a.days.size, avg: a.minutes / a.n, share: total ? a.minutes / total : 0, title: projTitle(a.p) }));
+  const { key, dir } = st.sort;
+  list.sort((a, b) => (typeof a[key] === "string" ? a[key].localeCompare(b[key], L().locale) : a[key] - b[key]) * dir);
+  const cols = [["title", ""], ["minutes", "r"], ["share", "r"], ["n", "r"], ["active", "r"], ["avg", "r"], ["last", "r"]];
+  const sortBy = (k) => { st.sort = { key: k, dir: k === key ? -dir : (k === "title" ? 1 : -1) }; renderProjectTable(rows); };
+  const thead = el("thead", null, el("tr", null, cols.map(([k, cls]) => el("th", {
+    class: cls, scope: "col", tabindex: 0, "aria-sort": k === key ? (dir > 0 ? "ascending" : "descending") : null,
+    onclick: () => sortBy(k), onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); sortBy(k); } },
+  }, L().cols[k] + (k === key ? (dir > 0 ? " ↑" : " ↓") : "")))));
+  const tbody = el("tbody");
+  for (const a of list) {
+    const pr = DATA.projects[a.p] || {};
+    const stKey = statusKey(pr.status);
+    tbody.append(el("tr", { class: st.project === a.p ? "on" : "", onclick: () => setProject(a.p) },
+      el("td", null, el("span", { class: "pname" }, el("span", { class: "sw", style: `background:${COLORS[a.p] || "var(--other)"}` }), a.title),
+        pr.status && stKey !== "active" ? [" ", el("span", { class: "pill" }, statusLabel(pr.status))] : null),
+      el("td", { class: "r num" }, fmtMin(a.minutes)), el("td", { class: "r num" }, fmtPct(a.share)),
+      el("td", { class: "r num" }, nf(a.n)), el("td", { class: "r num" }, nf(a.active)), el("td", { class: "r num" }, fmtMin(a.avg)),
+      el("td", { class: "r num" }, shortDate(a.last))));
+  }
+  if (!list.length) tbody.append(el("tr", null, el("td", { colspan: cols.length, class: "empty" }, T("noData"))));
+  t.append(thead, tbody);
+}
+
+// ---------- project detail ----------
+function obsidianLink(rel) {
+  const vaultName = DATA.vault_name || (DATA.vault || "").split(/[\\/]/).filter(Boolean).pop() || "Vault";
+  return `obsidian://open?vault=${encodeURIComponent(vaultName)}&file=${encodeURIComponent(rel.replace(/\.md$/, ""))}`;
+}
+function renderProjectDetail(rows) {
+  const box = $("projectDetail"); box.replaceChildren();
+  if (!st.project) { box.hidden = true; return; }
+  box.hidden = false;
+  const p = DATA.projects[st.project] || { title: st.project };
+  const mine = rows.filter((s) => s.project === st.project);
+  const latestOpen = mine.find((s) => s.open && s.open.length);
+  const decisions = [], seen = new Set();
+  for (const s of mine) for (const d of s.decisions || []) if (!seen.has(d)) { seen.add(d); decisions.push([s, d]); }
+  const page = st.project.startsWith("PRJ-") ? `02-Projects/${st.project}/${st.project}.md` : null;
+  box.append(
+    el("div", { class: "pd-top" },
+      el("span", { class: "sw", style: `width:12px;height:12px;border-radius:3px;background:${COLORS[st.project] || "var(--other)"}` }),
+      el("h2", null, projTitle(st.project)), p.status ? el("span", { class: "pill" }, statusLabel(p.status)) : null,
+      p.updated ? el("span", { class: "muted", style: "font-size:12px" }, T("pageUpdated", shortDate(p.updated))) : null,
+      el("button", { class: "btn", type: "button", style: "margin-left:auto", onclick: () => setProject(st.project) }, T("clearFocus"))),
+    p.description ? el("p", { class: "pd-desc" }, p.description) : null,
+    el("div", { class: "pd-links" },
+      page && !DATA.demo ? el("a", { href: obsidianLink(page) }, T("openInObsidian")) : null,
+      p.repos && p.repos.length ? el("span", { class: "muted" }, `${page && !DATA.demo ? "  ·  " : ""}${T("repos")}: ${p.repos.join(", ")}`) : null),
+    el("div", { class: "pd-grid" },
+      el("div", null, el("div", { class: "sub-h" }, latestOpen ? T("openFrom", shortDate(latestOpen.date), latestOpen.start) : T("openItems")),
+        latestOpen ? el("ul", null, latestOpen.open.map((x) => el("li", null, x))) : el("div", { class: "muted" }, T("noOpen")),
+        latestOpen ? el("div", { class: "muted", style: "font-size:11.5px;margin-top:6px" }, T("openNote")) : null),
+      el("div", null, el("div", { class: "sub-h" }, T("recentDecisions")),
+        decisions.length ? el("ul", null, decisions.slice(0, 10).map(([s, d]) => el("li", null, el("span", { class: "muted" }, shortDate(s.date) + " · "), d)))
+          : el("div", { class: "muted" }, T("noDecisions")))),
+  );
+}
+
+// ---------- session list ----------
+function renderSessions(rows) {
+  const host = $("sessions"); host.replaceChildren();
+  $("sessCount").textContent = T("sessCount", nf(rows.length), st.q);
+  $("csv").disabled = !rows.length;
+  if (!rows.length) { host.append(el("div", { class: "empty" }, T("noSessions"))); return; }
+  const sec = L().sec;
+  const section = (title, items) => (items && items.length ? [el("h4", null, title), el("ul", null, items.map((x) => el("li", null, x)))] : null);
+  for (const s of rows.slice(0, st.shown)) {
+    const d = el("details", null,
+      el("summary", null,
+        el("span", { class: "num ink2" }, shortDate(s.date) + " " + FMT.wd[weekday(s.date)]),
+        el("span", { class: "num muted c-time" }, s.start || "—"),
+        el("span", { class: "pname", style: "min-width:0" }, el("span", { class: "sw", style: `background:${COLORS[s.project] || "var(--other)"}` }),
+          el("span", { style: "overflow:hidden;text-overflow:ellipsis;white-space:nowrap" }, shortTitle(s.project))),
+        el("span", { class: "num" }, fmtMin(s.minutes)),
+        el("span", { class: "title" }, s.title || "—", el("span", { class: "muted" }, `  ·  ${s.machine}`))),
+      el("div", { class: "body" },
+        s.request ? [el("h4", null, sec.request), el("div", null, s.request)] : null,
+        section(sec.done, s.done), section(sec.decisions, s.decisions), section(sec.open, s.open), section(sec.other, s.other),
+        el("h4", null, sec.source), DATA.demo ? el("span", null, s.file) : el("a", { href: obsidianLink(s.file) }, s.file),
+        el("span", { class: "muted" }, `  ·  ${s.tool}`)));
+    host.append(d);
+  }
+  if (rows.length > st.shown) {
+    host.append(el("div", { class: "more" }, el("button", { class: "btn", type: "button",
+      onclick: () => { st.shown += 60; renderSessions(rows); } }, T("showMore", nf(Math.min(60, rows.length - st.shown))))));
+  }
+}
+
+// ---------- CSV export ----------
+function exportCsv() {
+  const rows = filtered();
+  if (!rows.length) return;
+  const cell = (v) => {
+    let s = String(v == null ? "" : v);
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; // keep spreadsheets from evaluating text as a formula
+    return /[",\n\r;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const lines = [L().csvCols.join(",")];
+  for (const s of rows) lines.push([s.date, s.start, projTitle(s.project), s.machine, s.tool, s.minutes, s.title].map(cell).join(","));
+  const blob = new Blob(["﻿" + lines.join("\r\n") + "\r\n"], { type: "text/csv;charset=utf-8" });
+  const a = el("a", { href: URL.createObjectURL(blob), download: `vault-memory-sessions_${st.from}_${st.to}.csv` });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// ---------- header and banner ----------
+function renderMeta() {
+  const b = dataBounds();
+  const gen = DATA.generated ? DATA.generated.slice(11, 16) : "";
+  const meta = $("meta"); meta.replaceChildren();
+  if (DATA.demo) meta.append(el("span", { class: "tag" }, T("metaDemo")), " ");
+  meta.append(T("meta", DATA.demo ? "demo" : DATA.vault, shortDate(b.min), shortDate(b.max), nf(DATA.sessions.length), gen));
+  if (STATUS && STATUS.last_log) {
+    const when = STATUS.last_log.slice(0, 16);
+    const t = when.slice(0, 10) === today() ? when.slice(11) : `${shortDate(when.slice(0, 10))} ${when.slice(11)}`;
+    meta.append(" · ", el("span", { title: STATUS.last_log }, T("workerLast", t)));
+  } else if (STATUS && STATUS.error) {
+    meta.append(" · ", el("span", { title: STATUS.error }, T("statusErr")));
+  }
+  const msgs = [];
+  if (STATUS && STATUS.pending) msgs.push(T("pending", STATUS.pending, STATUS.ready));
+  if (STATUS && STATUS.backfill) msgs.push(T("backfill", STATUS.backfill));
+  if (STATUS && (STATUS.alert || STATUS.warning)) msgs.push(STATUS.alert || STATUS.warning);
+  if (DATA.warnings && DATA.warnings.length) {
+    msgs.push(`${T("mismatchHead")}: ${DATA.warnings.map((w) => (typeof w === "string" ? w : T("mismatch", w))).join(" ")}`);
+  }
+  $("banner").hidden = !msgs.length;
+  $("bannerText").replaceChildren(...msgs.map((m) => el("p", null, m)));
+}
+
+// ---------- render ----------
+function render() {
+  hideTip();
+  syncFilterUI();
+  savePrefs();
+  const rows = filtered();
+  renderMeta();
+  renderKpis(rows);
+  renderProjectDetail(rows);
+  renderDaily(rows);
+  renderByProject(rows);
+  renderHeat(rows);
+  renderDims(rows);
+  renderHist(rows);
+  renderProjectTable(rows);
+  renderSessions(rows);
+}
+
+// ---------- events ----------
+$("from").addEventListener("change", (e) => { if (e.target.value) { st.from = e.target.value; st.preset = ""; if (st.from > st.to) st.to = st.from; render(); } });
+$("to").addEventListener("change", (e) => { if (e.target.value) { st.to = e.target.value; st.preset = ""; if (st.to < st.from) st.from = st.to; render(); } });
+$("fproject").addEventListener("change", (e) => { st.project = e.target.value; st.shown = 40; render(); });
+$("fmachine").addEventListener("change", (e) => { st.machine = e.target.value; render(); });
+$("ftool").addEventListener("change", (e) => { st.tool = e.target.value; render(); });
+let qTimer = 0;
+$("q").addEventListener("input", (e) => { clearTimeout(qTimer); qTimer = setTimeout(() => { st.q = e.target.value; st.shown = 40; render(); }, 150); });
+$("reset").addEventListener("click", () => { Object.assign(st, { preset: "thisMonth", project: "", machine: "", tool: "", q: "", shown: 40 }); $("q").value = ""; applyPreset(); render(); });
+$("theme").addEventListener("click", () => {
+  const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  document.documentElement.dataset.theme = cur === "dark" ? "light" : "dark";
+  savePrefs();
+});
+for (const b of $("lang").children) b.addEventListener("click", () => setLang(b.dataset.lang, true));
+$("refresh").addEventListener("click", () => refresh(true));
+$("csv").addEventListener("click", exportCsv);
+let rzTimer = 0, lastW = 0;
+new ResizeObserver(() => {
+  const w = $("app").clientWidth;
+  if (!DATA || w === lastW) return;
+  lastW = w; clearTimeout(rzTimer); rzTimer = setTimeout(render, 120);
+}).observe($("app"));
+
+// ---------- loading ----------
+const INJECTED = window.__VM_DATA__ || window.__PANO_DATA__ || null;
+async function getJSON(url) { const r = await fetch(url, { cache: "no-store" }); if (!r.ok) throw new Error(`${url}: ${r.status}`); return r.json(); }
+async function refresh(manual) {
+  if (INJECTED) return;
+  document.body.classList.add("loading");
+  try {
+    const [data, status] = await Promise.all([getJSON("/api/data"), getJSON("/api/status").catch(() => null)]);
+    STATUS = status;
+    const first = !DATA;
+    if (!DATA || data.generated !== DATA.generated || manual) {
+      DATA = prepare(data);
+      if (first) setLang(pickLang(), false);
+      buildFilters();
+      if (first || st.preset) applyPreset();
+    }
+    render();
+  } catch (e) {
+    $("meta").textContent = T("loadErr", e.message);
+  } finally {
+    document.body.classList.remove("loading");
+  }
+}
+loadPrefs();
+// ?lang=tr&theme=dark (or window.__VM_VIEW__) overrides the saved view for this load, e.g. for screenshots.
+(() => {
+  let q = {};
+  try { q = Object.fromEntries(new URLSearchParams(location.search)); } catch (e) { /* no query */ }
+  const v = Object.assign({}, window.__VM_VIEW__ || {}, q);
+  if (v.lang === "en" || v.lang === "tr") LANG_SAVED = v.lang;
+  if (v.theme === "light" || v.theme === "dark") document.documentElement.dataset.theme = v.theme;
+})();
+LANG = pickLang();
+buildFormatters();
+applyStatic();
+if (INJECTED) {
+  DATA = prepare(INJECTED); STATUS = window.__VM_STATUS__ || window.__PANO_STATUS__ || null;
+  setLang(pickLang(), false);
+  buildFilters(); applyPreset(); render();
+} else {
+  $("meta").textContent = T("reading");
+  refresh(false);
+  setInterval(() => { if (!document.hidden) refresh(false); }, 60000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(false); });
+}
+</script>
+</body>
+</html>

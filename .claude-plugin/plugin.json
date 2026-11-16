@@ -1,0 +1,22 @@
+{
+  "name": "vault-memory",
+  "version": "1.0.0",
+  "description": "Skills to set up, query and maintain an Obsidian vault that your Claude Code and Codex sessions are written into automatically (Karpathy's LLM Wiki pattern), plus per-project time reports and a local dashboard.",
+  "author": {
+    "name": "Yusuf Karan",
+    "url": "https://github.com/yusufkaran"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/yusufkaran/obsidian-agent-memory",
+  "repository": "https://github.com/yusufkaran/obsidian-agent-memory",
+  "keywords": [
+    "obsidian",
+    "memory",
+    "llm-wiki",
+    "knowledge-base",
+    "time-tracking",
+    "dashboard",
+    "codex",
+    "git-sync"
+  ]
+}
