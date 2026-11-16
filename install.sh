@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Vault Memory installer and updater.
+# LLM Wiki Autopilot installer and updater.
 #
 #   ./install.sh --vault ~/Vault [--lang en|tr] [--machine NAME] [--remote GIT_URL]
 #                [--timer] [--dashboard] [--no-hooks] [--no-skill]
@@ -135,7 +135,7 @@ fi
 
 cat <<EOF
 
-Vault Memory is ready.
+LLM Wiki Autopilot is ready.
   vault:     $VAULT ($LANG_SET)
   command:   ~/.vault-memory/bin/vm   (add ~/.vault-memory/bin to PATH to type just "vm")
   dashboard: vm dashboard

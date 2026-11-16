@@ -1,5 +1,5 @@
 {
-  "name": "vault-memory",
+  "name": "llm-wiki-autopilot",
   "version": "1.0.0",
   "description": "Skills to set up, query and maintain an Obsidian vault that your Claude Code and Codex sessions are written into automatically (Karpathy's LLM Wiki pattern), plus per-project time reports and a local dashboard.",
   "author": {
@@ -7,8 +7,8 @@
     "url": "https://github.com/yusufkaran"
   },
   "license": "MIT",
-  "homepage": "https://github.com/yusufkaran/obsidian-agent-memory",
-  "repository": "https://github.com/yusufkaran/obsidian-agent-memory",
+  "homepage": "https://github.com/yusufkaran/llm-wiki-autopilot",
+  "repository": "https://github.com/yusufkaran/llm-wiki-autopilot",
   "keywords": [
     "obsidian",
     "memory",

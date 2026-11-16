@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""vault-memory (vm): turns Claude Code and Codex sessions into an Obsidian vault that maintains itself.
+"""LLM Wiki Autopilot (vm): turns Claude Code and Codex sessions into an Obsidian vault that maintains itself.
 
 Standard library only; Python 3.9+. The rules for agents live in CLAUDE.md at the vault root.
-Spec: docs/SPEC.md in https://github.com/yusufkaran/obsidian-agent-memory
+Spec: docs/SPEC.md in https://github.com/yusufkaran/llm-wiki-autopilot
 """
 import argparse
 import copy
@@ -247,7 +247,7 @@ MESSAGES = {
     "un_removed": ("Removed: %s", "Kaldırıldı: %s"),
     "un_done": ("Uninstalled. The vault (%s) and %s were left in place; delete them yourself if you want.",
                 "Kaldırıldı. Vault (%s) ve %s yerinde bırakıldı; istersen kendin sil."),
-    "help": ("Vault memory: Claude Code and Codex sessions into an Obsidian vault", "Vault hafıza aracı"),
+    "help": ("LLM Wiki Autopilot: Claude Code and Codex sessions into an Obsidian vault", "LLM Wiki Autopilot: vault hafıza aracı"),
     "h_worker": ("process finished sessions", "bekleyen oturumları işle"),
     "h_now": ("do not wait for the idle time", "bekleme süresini bekleme"),
     "h_session": ("only this session id", "yalnızca bu oturum kimliği"),
@@ -3220,7 +3220,7 @@ def main():
     except Exception:
         pass
     ap = argparse.ArgumentParser(prog="vm", description=T("help"))
-    ap.add_argument("--version", action="version", version="vault-memory %s" % VERSION, help=T("h_version"))
+    ap.add_argument("--version", action="version", version="llm-wiki-autopilot (vm) %s" % VERSION, help=T("h_version"))
     sub = ap.add_subparsers(dest="cmd")
     w = sub.add_parser("worker", help=T("h_worker"))
     w.add_argument("--now", action="store_true", help=T("h_now"))

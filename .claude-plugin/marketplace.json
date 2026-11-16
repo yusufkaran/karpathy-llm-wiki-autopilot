@@ -1,6 +1,6 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "obsidian-agent-memory",
+  "name": "llm-wiki-autopilot",
   "owner": {
     "name": "Yusuf Karan",
     "url": "https://github.com/yusufkaran"
@@ -11,7 +11,7 @@
   },
   "plugins": [
     {
-      "name": "vault-memory",
+      "name": "llm-wiki-autopilot",
       "source": "./",
       "description": "Skills to set up, query and maintain an Obsidian vault that your Claude Code and Codex sessions are written into automatically (Karpathy's LLM Wiki pattern), plus per-project time reports and a local dashboard.",
       "version": "1.0.0",
@@ -20,7 +20,7 @@
         "url": "https://github.com/yusufkaran"
       },
       "category": "productivity",
-      "homepage": "https://github.com/yusufkaran/obsidian-agent-memory",
+      "homepage": "https://github.com/yusufkaran/llm-wiki-autopilot",
       "keywords": [
         "obsidian",
         "memory",

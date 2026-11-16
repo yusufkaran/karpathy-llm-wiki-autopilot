@@ -121,7 +121,7 @@ Yalnızca `~/.vault-memory/bin/vm` yoksa ya da kullanıcı kurulum isterse.
 
    ```bash
    if [ -d ~/.vault-memory/src/.git ]; then git -C ~/.vault-memory/src pull --ff-only; \
-   else git clone https://github.com/yusufkaran/obsidian-agent-memory ~/.vault-memory/src; fi
+   else git clone https://github.com/yusufkaran/llm-wiki-autopilot ~/.vault-memory/src; fi
    ```
 
 3. Kur:

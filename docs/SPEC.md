@@ -1,4 +1,4 @@
-# Vault Memory: format and interface spec
+# LLM Wiki Autopilot: format and interface spec
 
 This file is the contract between the CLI (`system/bin/vault_memory.py`), the dashboard
 (`system/dashboard/`), the vault template (`template/`) and the skills (`skills/`).

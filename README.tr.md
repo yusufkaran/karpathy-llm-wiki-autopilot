@@ -1,8 +1,10 @@
-# Vault Memory
+# LLM Wiki Autopilot
 
 [English](README.md) | Türkçe
 
-Kodlama ajanları için kalıcı hafıza. Bitirdiğin her Claude Code ve Codex oturumu bir Obsidian vault'una
+**Claude Code ve Codex için kalıcı hafıza; Obsidian'a kendiliğinden yazılır.**
+
+Bitirdiğin her Claude Code ve Codex oturumu bir Obsidian vault'una
 damıtılır: tarihli oturum kaydı, güncel proje sayfası, kararlar, öğrenimler. Vault bir git deposundaki düz
 Markdown'dır; makinelerin arasında eşitlenir ve yeni oturumlar projenin güncel durumunu bilerek başlar. Andrej
 Karpathy'nin "LLM Wiki" modelini izler: sen kaynak getirir ve soru sorarsın, yazma ve bakım işini ajan yapar.
@@ -56,7 +58,7 @@ git commit + push ──► özel uzak depon ──► diğer makineler çeker
 ## Hızlı başlangıç
 
 ```bash
-git clone https://github.com/yusufkaran/obsidian-agent-memory ~/.vault-memory/src
+git clone https://github.com/yusufkaran/llm-wiki-autopilot ~/.vault-memory/src
 ~/.vault-memory/src/install.sh --vault ~/Vault --lang tr --timer
 ```
 
@@ -114,15 +116,15 @@ Araç vault'un içinde durduğu için her makine en son eşitlenen sürümü ça
 ### Claude Code plugin'i olarak kurma
 
 ```
-/plugin marketplace add yusufkaran/obsidian-agent-memory
-/plugin install vault-memory@obsidian-agent-memory
+/plugin marketplace add yusufkaran/llm-wiki-autopilot
+/plugin install llm-wiki-autopilot@llm-wiki-autopilot
 ```
 
 Sonra Claude'a "vault hafıza kurulumunu yap" de. Skill vault'un nerede duracağını, dilini ve bir uzak depoyla
 eşitlenip eşitlenmeyeceğini sorar, sonra kurulum betiğini `--no-skill` ile çalıştırır. Plugin skill'i İngilizce
 (`vault-memory`) ve Türkçe (`vault-hafiza`) olarak getirir.
 
-Plugin sistemi olmadan: `npx skills add yusufkaran/obsidian-agent-memory`.
+Plugin sistemi olmadan: `npx skills add yusufkaran/llm-wiki-autopilot`.
 
 ## Pano
 

@@ -1,49 +1,45 @@
-# Vault Memory
+# LLM Wiki Autopilot
+
+**Persistent memory for Claude Code and Codex, written into Obsidian automatically.**
+
+Every coding-agent session you finish becomes part of a wiki: a dated session log, a living page per project,
+decisions and lessons. It is Andrej Karpathy's "LLM Wiki" pattern on autopilot: no "save this" prompts, no
+manual notes. The wiki is plain Markdown in a git repository, so it syncs across your machines, and every new
+Claude Code session starts with the project's current status already in context. A local dashboard shows where
+your time went.
+
+[![test](https://github.com/yusufkaran/llm-wiki-autopilot/actions/workflows/test.yml/badge.svg)](https://github.com/yusufkaran/llm-wiki-autopilot/actions/workflows/test.yml)
+![License: MIT](https://img.shields.io/badge/license-MIT-blue)
+![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue)
+![macOS | Linux](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey)
+![No dependencies](https://img.shields.io/badge/dependencies-none-brightgreen)
 
 English | [Türkçe](README.tr.md)
-
-Persistent memory for coding agents. Every Claude Code and Codex session you finish is distilled into an
-Obsidian vault: a dated session entry, an up-to-date project page, decisions, lessons. The vault is plain
-Markdown in a git repository, so it syncs across your machines, and new sessions start with the project's
-current status already in context. It follows Andrej Karpathy's "LLM Wiki" pattern: you bring sources and ask
-questions, the agent does the writing and the upkeep. A local dashboard shows where your time went.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/dashboard-dark.png">
   <img alt="Dashboard" src="docs/dashboard.png">
 </picture>
 
-## How it works
-
-```
-Claude Code / Codex transcripts   (~/.claude/projects, ~/.codex/sessions)
-        │  session idle for 20 min; a hook or the 5-minute timer starts the worker
-        ▼
-vm worker      builds a digest: messages, tool calls, changed files; secrets redacted
-        │
-        ▼
-claude -p      tools limited to Read/Glob/Grep/Edit/Write; appends the session entry,
-        │      updates the project page, opens ADRs and topic pages when warranted
-        ▼
-git commit + push ──► your private remote ──► other machines pull
-                                              (SessionStart hook, timer)
-```
-
 ## Features
 
-- **Automatic session log.** Each finished session becomes an entry in a per-project, per-day file with what
-  was asked, what was done, decisions and open items. Trivial sessions get a one-line entry.
+- **Runs by itself.** Claude Code hooks and a 5-minute timer pick up every finished session. Nothing to remember.
+- **Session log.** Each session becomes an entry in a per-project, per-day file: what was asked, what was done,
+  decisions and open items. Trivial sessions get a one-line entry.
 - **Living project pages.** Status, open items, decisions and "good to know" are rewritten after every session.
-- **Memory at session start.** A `SessionStart` hook puts the current project's status, open items and last
-  five sessions into every new Claude Code session.
-- **Time tracking.** Active minutes per session, `vm report` for tables, and a local dashboard for charts.
-- **Several machines.** Git sync with a shared ledger, so a session is never processed twice. A laptop that
+  Architecture decision records, topic pages and tool pages are opened when a session warrants them.
+- **Memory at session start.** A `SessionStart` hook gives every new Claude Code session the project's status,
+  open items and last five sessions. Agents without hooks, such as Codex, can print the same text with `vm context`.
+- **Time tracking.** Active minutes per project and day: `vm report` in the terminal, a local dashboard with charts.
+- **Several machines, one memory.** Git sync with a shared ledger, so no session is processed twice. A laptop that
   was closed mid-session can hand its last session to an always-on machine.
-- **Source ingest.** Drop an article or PDF into `00-Inbox/` or `05-Raw/clippings/`; `vm ingest` writes a
-  summary page and updates the pages it touches.
+- **Source ingest.** Drop an article or PDF into `00-Inbox/` or `05-Raw/clippings/`; `vm ingest` writes a summary
+  page and updates the pages it touches.
 - **Health check.** `vm lint` finds broken links, orphan pages and missing frontmatter.
-- **English or Turkish** vault pages, CLI messages and dashboard.
-- **Small footprint.** One stdlib-only Python file, no database, no server process except the optional dashboard.
+- **Safe by default.** Secrets are redacted before anything reaches the model, commits that contain a secret are
+  blocked, and the background agent cannot change its own code, config or instruction files.
+- **Light.** One Python file using only the standard library. No database, no always-on daemon.
+- **English or Turkish** vault pages, CLI output and dashboard.
 
 ## Requirements
 
@@ -55,7 +51,7 @@ git commit + push ──► your private remote ──► other machines pull
 ## Quick start
 
 ```bash
-git clone https://github.com/yusufkaran/obsidian-agent-memory ~/.vault-memory/src
+git clone https://github.com/yusufkaran/llm-wiki-autopilot ~/.vault-memory/src
 ~/.vault-memory/src/install.sh --vault ~/Vault --lang en --timer
 ```
 
@@ -81,6 +77,7 @@ The installer:
 | `--no-hooks` | Don't touch `~/.claude/settings.json` |
 | `--no-skill` | Don't install the skill (e.g. when it comes from the plugin) |
 
+The CLI is `vm`, installed in `~/.vault-memory/bin` (add that folder to your `PATH` to type just `vm`).
 Open the vault folder in Obsidian if you like; it already has templates, a sessions table view and daily notes set up.
 
 To import past sessions, queue them and let the worker run (one LLM call per session):
@@ -113,15 +110,31 @@ often closed, turn on `vm config capture true`; on an always-on machine, `vm con
 ### Install as a Claude Code plugin
 
 ```
-/plugin marketplace add yusufkaran/obsidian-agent-memory
-/plugin install vault-memory@obsidian-agent-memory
+/plugin marketplace add yusufkaran/llm-wiki-autopilot
+/plugin install llm-wiki-autopilot@llm-wiki-autopilot
 ```
 
 Then ask Claude to "set up vault memory". The skill asks where the vault should live, which language to use and
 whether to sync with a remote, then runs the installer with `--no-skill`. The plugin ships the skill in English
 (`vault-memory`) and Turkish (`vault-hafiza`).
 
-Without the plugin system: `npx skills add yusufkaran/obsidian-agent-memory`.
+Without the plugin system: `npx skills add yusufkaran/llm-wiki-autopilot`.
+
+## How it works
+
+```
+Claude Code / Codex transcripts   (~/.claude/projects, ~/.codex/sessions)
+        │  session idle for 20 min; a hook or the 5-minute timer starts the worker
+        ▼
+vm worker      builds a digest: messages, tool calls, changed files; secrets redacted
+        │
+        ▼
+claude -p      tools limited to Read/Glob/Grep/Edit/Write; appends the session entry,
+        │      updates the project page, opens ADRs and topic pages when warranted
+        ▼
+git commit + push ──► your private remote ──► other machines pull
+                                              (SessionStart hook, timer)
+```
 
 ## Dashboard
 
@@ -285,6 +298,22 @@ Removes the hooks, timer, dashboard service and skill from this machine. Your va
   that the timer is installed (`vm install --timer`), and that the session has been idle for `idle_minutes`.
   `vm worker --now` skips the wait.
 - **A session landed in the wrong project:** fix `repos` / `folders` on the project pages; later sessions follow.
+
+## FAQ
+
+**Do I need Obsidian?** No. The vault is a folder of Markdown files in git; Obsidian is just a good way to read it
+(templates, a sessions table and daily notes are set up for it).
+
+**Does my code or my transcripts leave the machine?** Only a redacted digest of each session goes to Claude, through
+your own Claude Code login, and the resulting pages go to the git remote you choose. See
+[Privacy and safety](#privacy-and-safety).
+
+**Which agents are supported?** Claude Code and the Codex CLI: their transcripts are read from `~/.claude/projects`
+and `~/.codex/sessions`. Session-start memory is automatic in Claude Code; other agents can call `vm context`.
+
+**What does it cost?** One `claude -p` call per finished session that has real content. See [Cost](#cost).
+
+**Can I import my old sessions?** Yes, with `vm backfill --days N`; see [Quick start](#quick-start).
 
 ## Repository layout
 

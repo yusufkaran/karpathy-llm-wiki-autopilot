@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Vault Memory dashboard: a local, read-only view of the session records in the vault.
+"""LLM Wiki Autopilot dashboard: a local, read-only view of the session records in the vault.
 
 It reads the vault path and the frontmatter parser from vault_memory.py, so the numbers come
 from the same files as `vm report`.
@@ -43,7 +43,7 @@ def get_vm():
     if _vm is None:
         path = next((p for p in vm_candidates() if p.exists()), None)
         if path is None:
-            sys.exit("vault_memory.py not found (looked in: %s). Install Vault Memory first, or run with --demo."
+            sys.exit("vault_memory.py not found (looked in: %s). Install LLM Wiki Autopilot first, or run with --demo."
                      % ", ".join(str(p) for p in vm_candidates()))
         spec = importlib.util.spec_from_file_location("vault_memory", str(path))
         mod = importlib.util.module_from_spec(spec)
@@ -552,7 +552,7 @@ def already_running(url):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="vm dashboard", description="Local Vault Memory dashboard (read-only).")
+    ap = argparse.ArgumentParser(prog="vm dashboard", description="Local LLM Wiki Autopilot dashboard (read-only).")
     ap.add_argument("--host", default=os.environ.get("VM_DASHBOARD_HOST", "127.0.0.1"))
     ap.add_argument("--port", type=int, default=int(os.environ.get("VM_DASHBOARD_PORT", "4747")))
     ap.add_argument("--open", action="store_true", help="open the dashboard in the browser once it is listening")
@@ -591,7 +591,7 @@ def main(argv=None):
     if args.host not in LOOPBACK:
         print("Warning: listening on %s makes your vault's session notes readable from the network." % args.host,
               file=sys.stderr)
-    print("Vault Memory dashboard%s: %s  (Ctrl+C to stop)" % (" (demo)" if args.demo else "", url), flush=True)
+    print("LLM Wiki Autopilot dashboard%s: %s  (Ctrl+C to stop)" % (" (demo)" if args.demo else "", url), flush=True)
     if args.open:
         threading.Timer(0.4, webbrowser.open, [url]).start()
     try:
